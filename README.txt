@@ -1,4 +1,4 @@
-This directory contains the xxx release of observed
+This directory contains the 0.1 release of observed
 
 What does this module do?
 -------------------------
@@ -28,6 +28,9 @@ a.bar('baz')
 
 This example is included in ./observed.usage.py.
 
+observed has the special feature that an object is not kept alive just by
+being an observer.
+
 News
 ----
 
@@ -43,7 +46,7 @@ observed is free (as in beer) software.  See the LICENSE file.
 Downloading
 -----------
 
-GNU Make can be obtained from the python package index
+observed can be obtained from the python package index
 
 XXX
 
