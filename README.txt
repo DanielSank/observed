@@ -26,7 +26,7 @@ a.bar('baz')
 >>> Object a invoked bar with arg='baz'
 >>> Object b invoked bar with arg='baz'
 
-This example is included in observed.examples.
+This example is included in ./observed.usage.py.
 
 News
 ----
@@ -49,24 +49,26 @@ XXX
 
 or via git
 
-XXX
+https://github.com/DanielSank/observed.git
 
 
 Documentation
 -------------
 
-XXX
+Basic usage is illustrated at the top of this file. Further examples are
+given in ./observed/usage.py
 
 
 Development
 -----------
 
-observed development is hosted on github. The current working repository is
-
-XXX
+observed development is hosted on github. The current working repository
+is given in the Downloading section above.
 
 
 Bug Reporting
 -------------
 
-Please submit bug tickets on XXX
+Please submit bug tickets on the github tracking system
+
+https://github.com/DanielSank/observed/issues
