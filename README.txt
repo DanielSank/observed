@@ -37,7 +37,7 @@ News
 See the file NEWS for the user-visible changes from previous releases.
 
 
-Licese
+License
 ------
 
 observed is free (as in beer) software.  See the LICENSE file.
@@ -48,7 +48,7 @@ Downloading
 
 observed can be obtained from the python package index
 
-XXX
+https://pypi.python.org/pypi/observed
 
 or via git
 
