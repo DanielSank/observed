@@ -1,10 +1,5 @@
-This directory contains the 0.1 release of observed
-
-What does this module do?
--------------------------
-
 observed allows you to to sign up methods to "observe" when other methods
-run.
+run:
 
 from observed import event
 
@@ -28,8 +23,19 @@ a.bar('baz')
 
 This example is included in ./observed.usage.py.
 
-observed has the special feature that an object is not kept alive just by
-being an observer.
+This functionality is useful when connecting back-end logic to a GUI. By
+using the @event decorator, the back-end class doesn't have to know
+anything about the GUI objects which are observing it. This kind of loose
+coupling makes your program much easier to organize and maintain.
+
+Notable features include:
+
+1. Being an observer does not keep an object alive. In other words, the
+   observer code does not keep any strong references to objects which
+   have signed up as observers.
+2. The @event decorator can be used with unhashable types, and can be
+   used on an arbitrary number of methods in each class.
+3. Tests included :)
 
 News
 ----
