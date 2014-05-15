@@ -37,6 +37,16 @@ Notable features include:
    used on an arbitrary number of methods in each class.
 3. Tests included :)
 
+
+Installation
+------------
+
+1. Unpack the source distribution.
+2. Navigate to the root directory of the unpacked distribution.
+3. At command prompt:
+      python setup.py install
+
+
 News
 ----
 
