@@ -64,7 +64,7 @@ Downloading
 
 observed can be obtained from the python package index
 
-https://pypi.python.org/pypi/observed
+https://pypi.python.org/pypi/observed (Not quite yet)
 
 or via git
 
