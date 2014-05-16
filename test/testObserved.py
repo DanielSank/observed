@@ -1,5 +1,5 @@
 import unittest
-from observed.observed import event
+from observed import event
 
 
 class Foo(object):

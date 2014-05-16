@@ -1,4 +1,4 @@
-from observed.observed import event
+from observed import event
 
 class Foo(object):
     def __init__(self, name):

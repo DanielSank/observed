@@ -1,1 +1,3 @@
-from observed import event
+from observed.base import event
+
+__all__ = ['event']
