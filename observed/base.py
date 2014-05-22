@@ -15,7 +15,7 @@ class ObservableMethod(object):
         self.objectWeakRef = weakref.ref(obj)
         self.callbacks = {}  #observing object ID -> weak ref, methodNames
 
-    def addObserver(self, boundMethod):
+    def addObserver(self, observer):
         """
         Register a bound method to observe this ObservableMethod.
 
@@ -25,15 +25,28 @@ class ObservableMethod(object):
         it again does nothing. In other words, there is no way to sign up an
         observer to be called back multiple times.
         """
-        obj = boundMethod.__self__
-        ID = id(obj)
-        if ID in self.callbacks:
-            s = self.callbacks[ID][1]
+        if hasattr(observer, "__self__"):
+            self.addBoundMethod(observer)
         else:
-            wr = weakref.ref(obj, Cleanup(ID, self.callbacks))
+            self.addFunction(observer)
+        
+    def addBoundMethod(self, boundMethod):
+        obj = boundMethod.__self__
+        objID = id(obj)
+        name = boundMethod.__name__
+        if objID in self.callbacks:
+            s = self.callbacks[objID][1]
+        else:
+            wr = weakref.ref(obj, Cleanup(objID, self.callbacks))
             s = set()
-            self.callbacks[ID] = (wr, s)
-        s.add(boundMethod.__name__)
+            self.callbacks[objID] = (wr, s)
+        s.add(name)
+
+    def addFunction(self, func):
+        objID = id(func)
+        if objID not in self.callbacks:
+            wr = weakref.ref(func, Cleanup(objID, self.callbacks))
+            self.callbacks[objID] = (wr, None)
 
     def discardObserver(self, boundMethod):
         """
@@ -52,10 +65,13 @@ class ObservableMethod(object):
         """
         result = self.func(self.objectWeakRef(), *arg, **kw)
         for ID in self.callbacks:
-            wr, methodNames = self.callbacks[ID]
+            wr, info = self.callbacks[ID]
             obj = wr()
-            for methodName in methodNames:
-                getattr(obj, methodName)(*arg, **kw)
+            if info:
+                for methodName in info:
+                    getattr(obj, methodName)(*arg, **kw)
+            else:
+                obj(*arg, **kw)
         return result
 
     @property
