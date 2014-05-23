@@ -85,7 +85,7 @@ class ObservableCallable(object):
         return self.objectWeakRef()
 
 
-class ObservableMethodDescriptor(object):
+class ObservableCallableDescriptor(object):
 
     def __init__(self, func):
         """
@@ -115,7 +115,7 @@ class ObservableMethodDescriptor(object):
 
 
 def event(func):
-    return ObservableMethodDescriptor(func)
+    return ObservableCallableDescriptor(func)
 
 
 class Cleanup(object):
