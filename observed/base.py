@@ -1,7 +1,7 @@
 import weakref
 import functools
 
-class ObservableMethod(object):
+class ObservableCallable(object):
     """
     A proxy for a bound method which can be observed.
 
@@ -19,7 +19,7 @@ class ObservableMethod(object):
         """
         Register a bound method to observe this ObservableMethod.
 
-        The observing method will be called whenever this ObservableMethod is
+        The observing method will be called whenever this ObservableCallable is
         called, and with the same arguments and keyword arguments. If a
         boundMethod has already been registered to as a callback, trying to add
         it again does nothing. In other words, there is no way to sign up an
@@ -77,10 +77,10 @@ class ObservableMethod(object):
     @property
     def __self__(self):
         """
-        Get a strong reference to the object owning this ObservableMethod
+        Get a strong reference to the object owning this ObservableCallable
 
-        This is needed so that ObservableMethod instances can observe other
-        ObservableMethod instances.
+        This is needed so that ObservableCallable instances can observe other
+        ObservableCallable instances.
         """
         return self.objectWeakRef()
 
@@ -90,9 +90,9 @@ class ObservableMethodDescriptor(object):
     def __init__(self, func):
         """
         To each instance of the class using this descriptor, I associate an
-        ObservableMethod.
+        ObservableCallable.
         """
-        self.instances = {}  # Instance id -> (weak ref, Observablemethod)
+        self.instances = {}  # Instance id -> (weak ref, ObservableCallable)
         self._func = func
 
     def __get__(self, inst, cls):
@@ -101,17 +101,17 @@ class ObservableMethodDescriptor(object):
         ID = id(inst)
         if ID in self.instances:
             wr, om = self.instances[ID]
-            if not wr():
+            if not wr():s
                 msg = "Object id %d should have been cleaned up"%(ID,)
                 raise RuntimeError(msg)
         else:
             wr = weakref.ref(inst, Cleanup(ID, self.instances))
-            om = ObservableMethod(inst, self._func)
+            om = ObservableCallable(inst, self._func)
             self.instances[ID] = (wr, om)
         return om
 
     def __set__(self, inst, val):
-        raise RuntimeError("Assigning to ObservableMethod not supported")
+        raise RuntimeError("Assigning to ObservableCallable not supported")
 
 
 def event(func):
