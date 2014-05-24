@@ -3,7 +3,6 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath('..'))
 from observed import event
-from observed.base import ObservableCallable
 
 
 class Foo(object):
@@ -59,7 +58,7 @@ class Test(unittest.TestCase):
             a = Foo('a', self.buf)
             b = Foo('b', self.buf)
             
-            @ObservableCallable
+            @event
             def f():
                 self.buf.append('f')
             
@@ -200,7 +199,7 @@ class Test(unittest.TestCase):
     # Observed object is a function
     
     def test_functionCallsFunction(self):
-        @ObservableCallable
+        @event
         def func(x):
             self.buf.append('func%s'%(x,))
         
@@ -212,7 +211,7 @@ class Test(unittest.TestCase):
         self.assertEqual(self.buf, ['funcq', 'buncq'])
 
     def test_functionCallsMethod(self):
-        @ObservableCallable
+        @event
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)
@@ -221,7 +220,7 @@ class Test(unittest.TestCase):
         self.assertEqual(self.buf, ['func', 'abaz'])
 
     def test_functionCallsObservableMethod(self):
-        @ObservableCallable
+        @event
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)
@@ -230,7 +229,7 @@ class Test(unittest.TestCase):
         self.assertEqual(self.buf, ['func', 'abar'])
 
     def test_objectCleanupFromObservableFunction(self):
-        @ObservableCallable
+        @event
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)

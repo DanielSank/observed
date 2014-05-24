@@ -65,7 +65,7 @@ class CallbackManager(object):
 class ObservableCallable(CallbackManager):
     """
     A proxy for a callable which can be observed.
-
+    
     I behave like a function or bound method, but other callables can
     subscribe to be called whenever I am called.
     """
@@ -75,6 +75,9 @@ class ObservableCallable(CallbackManager):
         functools.update_wrapper(self, func)
         self.inst = weakref.ref(obj) if obj else None
         CallbackManager.__init__(self)
+        
+        # When acting as a descriptor, keep dict of instances
+        self.instances = {} # instance id -> (inst weak ref, ObservableCallable)
 
     def __call__(self, *arg, **kw):
         """
@@ -111,20 +114,17 @@ class ObservableCallable(CallbackManager):
             msg = "'function' object has no attribute '__self__'"
             raise AttributeError(msg)
 
-
-class ObservableMethodDescriptor(object):
-
-    def __init__(self, func):
-        """
-        To each instance of the class using this descriptor, I associate an
-        ObservableCallable.
-        """
-        self.instances = {}  # Instance id -> (weak ref, ObservableCallable)
-        self._func = func
-
-    # Descriptor protocol for use with methods
+    # Descriptor interface
 
     def __get__(self, inst, cls):
+        """
+        Handle access as descriptor.
+        
+        If accessed by class I return myself.
+        
+        If accessed by instance I return an ObservableCallable which handles
+        that instance.
+        """
         if inst is None:
             return self
         ID = id(inst)
@@ -135,7 +135,7 @@ class ObservableMethodDescriptor(object):
                 raise RuntimeError(msg)
         else:
             wr = weakref.ref(inst, CleanupHandler(ID, self.instances))
-            om = ObservableCallable(self._func, inst)
+            om = ObservableCallable(self.func, inst)
             self.instances[ID] = (wr, om)
         return om
 
@@ -144,7 +144,7 @@ class ObservableMethodDescriptor(object):
 
 
 def event(func):
-    return ObservableMethodDescriptor(func)
+    return ObservableCallable(func)
 
 
 class CleanupHandler(object):
