@@ -1,19 +1,14 @@
 import weakref
 import functools
 
-class ObservableCallable(object):
-    """
-    A proxy for a callable which can be observed.
 
-    I behave like a function or bound method, but other callables can
-    subscribe to be called whenever I am called.
+class CallbackManager(object):
+    """
+    Other objects (callables) can sign up to be notified when I am called.
     """
 
-    def __init__(self, func, obj=None):
-        self.func = func
-        functools.update_wrapper(self, func)
-        self.inst = weakref.ref(obj) if obj else None
-        self.callbacks = {}  #observing object ID -> weak ref, methodNames
+    def __init__(self):
+        self.callbacks = {} #observing object ID -> weak ref, info
 
     def addObserver(self, observer):
         """
@@ -65,7 +60,22 @@ class ObservableCallable(object):
             objID = id(obj)
             if id(obj) in self.callbacks:
                 del self.callbacks[objID]
-    
+
+
+class ObservableCallable(CallbackManager):
+    """
+    A proxy for a callable which can be observed.
+
+    I behave like a function or bound method, but other callables can
+    subscribe to be called whenever I am called.
+    """
+
+    def __init__(self, func, obj=None):
+        self.func = func
+        functools.update_wrapper(self, func)
+        self.inst = weakref.ref(obj) if obj else None
+        CallbackManager.__init__(self)
+
     def __call__(self, *arg, **kw):
         """
         Invoke the callable which I proxy, and all of it's callbacks.
@@ -113,7 +123,7 @@ class ObservableMethodDescriptor(object):
         self._func = func
 
     # Descriptor protocol for use with methods
-    
+
     def __get__(self, inst, cls):
         if inst is None:
             return self
