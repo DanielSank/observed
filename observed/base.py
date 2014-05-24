@@ -149,4 +149,5 @@ class Cleanup(object):
         self.d = d
 
     def __call__(self, wr):
-        del self.d[self.key]
+        if self.key in self.d:
+            del self.d[self.key]
