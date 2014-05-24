@@ -3,10 +3,10 @@ import functools
 
 class ObservableCallable(object):
     """
-    A proxy for a bound method which can be observed.
+    A proxy for a callable which can be observed.
 
-    I behave like a bound method, but other bound methods can subscribe to be
-    called whenever I am called.
+    I behave like a function or bound method, but other callables can
+    subscribe to be called whenever I am called.
     """
 
     def __init__(self, func, obj=None):
@@ -17,19 +17,21 @@ class ObservableCallable(object):
 
     def addObserver(self, observer):
         """
-        Register a bound method to observe this ObservableMethod.
+        Register an observer to observe me.
 
-        The observing method will be called whenever this ObservableCallable is
-        called, and with the same arguments and keyword arguments. If a
-        boundMethod has already been registered to as a callback, trying to add
+        The observing function or method will be called whenever I am called,
+        and with the same arguments and keyword arguments. If a bound method
+        or function has already been registered to as a callback, trying to add
         it again does nothing. In other words, there is no way to sign up an
-        observer to be called back multiple times.
+        observer to be called back multiple times. This was a conscious design
+        choice which users are invited to complain about if there are use cases
+        which make this inconvenient.
         """
         if hasattr(observer, "__self__"):
             self.addBoundMethod(observer)
         else:
             self.addFunction(observer)
-        
+
     def addBoundMethod(self, boundMethod):
         obj = boundMethod.__self__
         objID = id(obj)
@@ -48,20 +50,28 @@ class ObservableCallable(object):
             wr = weakref.ref(func, Cleanup(objID, self.callbacks))
             self.callbacks[objID] = (wr, None)
 
-    def discardObserver(self, boundMethod):
+    def discardObserver(self, observer):
         """
-        Un-register a bound method.
+        Un-register an observer.
         """
-        obj = boundMethod.__self__
-        if id(obj) in self.callbacks:
-            self.callbacks[id(obj)][1].discard(boundMethod.__name__)
-
+        if hasattr(observer, "__self__"):  # bound method
+            objID = id(observer.__self__)
+            if objID in self.callbacks:
+                s = self.callbacks[objID][1]
+                s.discard(observer.__name__)
+                if len(s) == 0:
+                    del self.callbacks[objID]
+        else:  # regular function
+            objID = id(obj)
+            if id(obj) in self.callbacks:
+                del self.callbacks[objID]
+    
     def __call__(self, *arg, **kw):
         """
-        Invoke the method which I proxy, and all of it's callbacks.
+        Invoke the callable which I proxy, and all of it's callbacks.
 
         The callbacks are called with the same *args and **kw as the main
-        method.
+        callable.
         """
         if self.objectWeakRef:
             result = self.func(self.objectWeakRef(), *arg, **kw)
@@ -102,6 +112,8 @@ class ObservableMethodDescriptor(object):
         self.instances = {}  # Instance id -> (weak ref, ObservableCallable)
         self._func = func
 
+    # Descriptor protocol for use with methods
+    
     def __get__(self, inst, cls):
         if inst is None:
             return self
@@ -127,7 +139,7 @@ def event(func):
 
 class Cleanup(object):
     """
-    I manage remove elements from a dict whenever I'm called.
+    I manage removal of weak references from dicts.
 
     Use me as a weakref.ref callback to remove an object's id from a dict
     when that object is garbage collected.
