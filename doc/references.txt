@@ -1,0 +1,4 @@
+Detailed discussion on how to make wrappers that can wrap functions,
+instance methods, class methods, and static methods:
+
+http://blog.dscpl.com.au/2014/01/how-you-implemented-your-python.html
