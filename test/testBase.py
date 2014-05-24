@@ -36,6 +36,46 @@ class Test(unittest.TestCase):
     
     # Observed object is a bound method
     
+    def test_callbacks(self):
+        """
+        Test all combinations of types acting as observed and observer.
+        """
+        # Items is a tuple of (observed, [observers], expected buf)
+        items = [('a.bar',
+                    ['b.baz'],
+                    ['abar', 'bbaz']),
+                 ('a.bar',
+                    ['b.bar', 'b.baz'],
+                    ['abar', 'bbar', 'bbaz']),
+                 ('a.bar',
+                    ['b.bar', 'b.baz', 'f'],
+                    ['abar', 'bbar', 'bbaz', 'f']),
+                 ('f',
+                    ['b.bar', 'b.baz', 'a.bar'],
+                    ['abar', 'bbar', 'bbaz', 'f'])
+                ]
+        
+        for observedStr, observerStrs, expected in items:
+            a = Foo('a', self.buf)
+            b = Foo('b', self.buf)
+            
+            @ObservableCallable
+            def f():
+                self.buf.append('f')
+            
+            observed = {'a.bar':a.bar, 'b.bar':b.bar, 'f':f}[observedStr]
+            for observerStr in observerStrs:
+                observer = {'a.bar':a.bar, 'b.bar':b.bar,
+                            'b.baz':b.baz, 'f':f}[observerStr]
+                observed.addObserver(observer)
+            observed()
+            del observed, observer
+            self.buf.sort()
+            self.assertEqual(expected, self.buf)
+            del a, b
+            self.assertEqual(len(Foo.bar.instances), 0)
+            self.buf = []
+    
     def test_singleObservableMethodInstance(self):
         """
         Invoking a method decorated by @event activates the descriptor.
@@ -48,6 +88,8 @@ class Test(unittest.TestCase):
         self.assertEqual(Foo.bar.instances.keys(), [id(a)])
         self.assertEqual(len(a.bar.callbacks), 0)
         self.assertEqual(self.buf, ['abar'])
+        del a
+        self.assertEqual(len(Foo.bar.instances), 0)
     
     def test_twoObservableMethodInstances(self):
         """
@@ -65,7 +107,11 @@ class Test(unittest.TestCase):
         self.assertEqual(len(a.bar.callbacks), 0)
         self.assertEqual(len(b.bar.callbacks), 0)
         self.assertEqual(self.buf, ['abar', 'bbar'])
-    
+        del a
+        self.assertEqual(len(Foo.bar.instances), 1)
+        del b
+        self.assertEqual(len(Foo.bar.instances), 0)
+
     def test_methodCallsMethod(self):
         """
         Normal methods observe @event methods.
@@ -118,10 +164,12 @@ class Test(unittest.TestCase):
         b = Foo('b', self.buf)
         a.bar.addObserver(b.baz)
         self.assertEqual(len(a.bar.callbacks), 1)
+        a.bar()
         del b
         self.assertEqual(len(a.bar.callbacks), 0)
         a.bar()
-        self.assertEqual(self.buf, ['abar'])
+        self.buf.sort()
+        self.assertEqual(self.buf, ['abar','abar', 'bbaz'])
         self.assertEqual(len(Foo.bar.instances), 1)
         del a
         self.assertEqual(len(Foo.bar.instances), 0)
