@@ -9,10 +9,10 @@ class ObservableCallable(object):
     called whenever I am called.
     """
 
-    def __init__(self, obj, func):
+    def __init__(self, func, obj=None):
         self.func = func
         functools.update_wrapper(self, func)
-        self.objectWeakRef = weakref.ref(obj)
+        self.objectWeakRef = weakref.ref(obj) if obj else None
         self.callbacks = {}  #observing object ID -> weak ref, methodNames
 
     def addObserver(self, observer):
@@ -63,7 +63,10 @@ class ObservableCallable(object):
         The callbacks are called with the same *args and **kw as the main
         method.
         """
-        result = self.func(self.objectWeakRef(), *arg, **kw)
+        if self.objectWeakRef:
+            result = self.func(self.objectWeakRef(), *arg, **kw)
+        else:
+            result = self.func(*arg, **kw)
         for ID in self.callbacks:
             wr, info = self.callbacks[ID]
             obj = wr()
@@ -82,10 +85,14 @@ class ObservableCallable(object):
         This is needed so that ObservableCallable instances can observe other
         ObservableCallable instances.
         """
-        return self.objectWeakRef()
+        if self.objectWeakRef:
+            return self.objectWeakRef()
+        else:
+            msg = "'function' object has no attribute '__self__'"
+            raise AttributeError(msg)
 
 
-class ObservableCallableDescriptor(object):
+class ObservableMethodDescriptor(object):
 
     def __init__(self, func):
         """
@@ -101,12 +108,12 @@ class ObservableCallableDescriptor(object):
         ID = id(inst)
         if ID in self.instances:
             wr, om = self.instances[ID]
-            if not wr():s
+            if not wr():
                 msg = "Object id %d should have been cleaned up"%(ID,)
                 raise RuntimeError(msg)
         else:
             wr = weakref.ref(inst, Cleanup(ID, self.instances))
-            om = ObservableCallable(inst, self._func)
+            om = ObservableCallable(self._func, inst)
             self.instances[ID] = (wr, om)
         return om
 
@@ -115,7 +122,7 @@ class ObservableCallableDescriptor(object):
 
 
 def event(func):
-    return ObservableCallableDescriptor(func)
+    return ObservableMethodDescriptor(func)
 
 
 class Cleanup(object):

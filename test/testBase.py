@@ -3,14 +3,14 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath('..'))
 from observed import event
+from observed.base import ObservableCallable
 
 
 class Foo(object):
     
-    buf = []
-    
-    def __init__(self, name):
+    def __init__(self, name, buf):
         self.name = name
+        self.buf = buf
     
     @event
     def bar(self):
@@ -22,7 +22,7 @@ class Foo(object):
 
 class Test(unittest.TestCase):
     def setUp(self):
-        Foo.buf = []
+        self.buf = []
     
     def tearDown(self):
         # Remove all instances in the Foo.bar descriptor's instance dict.
@@ -34,72 +34,74 @@ class Test(unittest.TestCase):
         # setUp and then just delete it here.
         Foo.bar.instances = {}
     
-    def test_singleInstance(self):
+    # Observed object is a bound method
+    
+    def test_singleObservableMethodInstance(self):
         """
         Invoking a method decorated by @event activates the descriptor.
         
         Also check that decorated methods can be called.
         """
-        a = Foo('a')
+        a = Foo('a', self.buf)
         a.bar()
         self.assertEqual(len(Foo.bar.instances), 1)
         self.assertEqual(Foo.bar.instances.keys(), [id(a)])
         self.assertEqual(len(a.bar.callbacks), 0)
-        self.assertEqual(Foo.buf, ['abar'])
+        self.assertEqual(self.buf, ['abar'])
     
-    def test_twoInstances(self):
+    def test_twoObservableMethodInstances(self):
         """
         Invoking a method decorated by @event activates the descriptor.
         
         If an @event is called from two different instances, they should both
         be added to the descriptor's instance dict.
         """
-        a = Foo('a')
-        b = Foo('b')
+        a = Foo('a', self.buf)
+        b = Foo('b', self.buf)
         a.bar()
         b.bar()
         self.assertEqual(len(Foo.bar.instances), 2)
         self.assertEqual(set(Foo.bar.instances.keys()), set([id(a), id(b)]))
         self.assertEqual(len(a.bar.callbacks), 0)
         self.assertEqual(len(b.bar.callbacks), 0)
-        self.assertEqual(Foo.buf, ['abar', 'bbar'])
+        self.assertEqual(self.buf, ['abar', 'bbar'])
     
-    def test_methodCallback(self):
+    def test_methodCallsMethod(self):
         """
         Normal methods observe @event methods.
         
         Adding a normal (no @event) method as a callback causes that
         method to run when the observed method runs.
         """
-        a = Foo('a')
-        b = Foo('b')
+        a = Foo('a', self.buf)
+        b = Foo('b', self.buf)
         a.bar.addObserver(b.baz)
         self.assertEqual(len(a.bar.callbacks), 1)
         self.assertTrue(id(b) in a.bar.callbacks)
         a.bar()
-        self.assertEqual(Foo.buf, ['abar','bbaz'])
+        self.assertEqual(self.buf, ['abar','bbaz'])
     
-    def test_eventCallback(self):
+    def test_methodCallsObservableMethod(self):
         """
         @event methods observe other @event methods.
         """
-        a = Foo('a')
-        b = Foo('b')
+        a = Foo('a', self.buf)
+        b = Foo('b', self.buf)
         a.bar.addObserver(b.bar)
         mn = a.bar.callbacks[id(b)][1]
         self.assertEqual(len(a.bar.callbacks), 1)
         self.assertEqual(len(mn), 1)
         self.assertTrue('bar' in mn)
         a.bar()
-        Foo.buf.sort()
-        self.assertEqual(Foo.buf, ['abar','bbar'])
+        self.buf.sort()
+        self.assertEqual(self.buf, ['abar','bbar'])
     
-    def test_methodAndEventCallback(self):
+    def test_methodCallsObservableMethodAndMethod(self):
         """
         @event and normal methods simultaneously observe @event methods.
         """
-        a = Foo('a')
-        b = Foo('b')
+        a = Foo('a', self.buf)
+        b = Foo('b', self.buf)
         a.bar.addObserver(b.bar)
         a.bar.addObserver(b.baz)
         mn = a.bar.callbacks[id(b)][1]
@@ -108,44 +110,87 @@ class Test(unittest.TestCase):
         self.assertTrue('bar' in mn)
         self.assertTrue('baz' in mn)
         a.bar()
-        Foo.buf.sort()
-        self.assertEqual(Foo.buf, ['abar','bbar','bbaz'])
+        self.buf.sort()
+        self.assertEqual(self.buf, ['abar','bbar','bbaz'])
     
     def test_cleanup(self):
-        a = Foo('a')
-        b = Foo('b')
+        a = Foo('a', self.buf)
+        b = Foo('b', self.buf)
         a.bar.addObserver(b.baz)
         self.assertEqual(len(a.bar.callbacks), 1)
         del b
         self.assertEqual(len(a.bar.callbacks), 0)
         a.bar()
-        self.assertEqual(Foo.buf, ['abar'])
+        self.assertEqual(self.buf, ['abar'])
         self.assertEqual(len(Foo.bar.instances), 1)
         del a
         self.assertEqual(len(Foo.bar.instances), 0)
     
-    def test_functionCallback(self):
+    def test_methodCallsFunction(self):
         def func():
-            Foo.buf.append('func')
+            self.buf.append('func')
         
-        a = Foo('a')
+        a = Foo('a', self.buf)
         a.bar.addObserver(func)
         a.bar()
-        self.assertEqual(Foo.buf, ['abar', 'func'])
+        self.assertEqual(self.buf, ['abar', 'func'])
 
-    def test_methodAndEventAndFunctionCallback(self):
+    def test_methodCallsMethodAndObservableMethodAndFunction(self):
         def func():
-            Foo.buf.append('func')
-        a = Foo('a')
-        b = Foo('b')
+            self.buf.append('func')
+        a = Foo('a', self.buf)
+        b = Foo('b', self.buf)
         a.bar.addObserver(b.baz)
         a.bar.addObserver(b.bar)
         a.bar.addObserver(func)
         self.assertEqual(len(a.bar.callbacks), 2) # b and func
         self.assertEqual(set(a.bar.callbacks.keys()), set([id(b), id(func)]))
         a.bar()
-        Foo.buf.sort()
-        self.assertEqual(Foo.buf, ['abar', 'bbar', 'bbaz', 'func'])
+        self.buf.sort()
+        self.assertEqual(self.buf, ['abar', 'bbar', 'bbaz', 'func'])
+
+    # Observed object is a function
+    
+    def test_functionCallsFunction(self):
+        @ObservableCallable
+        def func(x):
+            self.buf.append('func%s'%(x,))
+        
+        def bunc(x):
+            self.buf.append('bunc%s'%(x,))
+        
+        func.addObserver(bunc)
+        func('q')
+        self.assertEqual(self.buf, ['funcq', 'buncq'])
+
+    def test_functionCallsMethod(self):
+        @ObservableCallable
+        def func():
+            self.buf.append('func')
+        a = Foo('a', self.buf)
+        func.addObserver(a.baz)
+        func()
+        self.assertEqual(self.buf, ['func', 'abaz'])
+
+    def test_functionCallsObservableMethod(self):
+        @ObservableCallable
+        def func():
+            self.buf.append('func')
+        a = Foo('a', self.buf)
+        func.addObserver(a.bar)
+        func()
+        self.assertEqual(self.buf, ['func', 'abar'])
+
+    def test_objectCleanupFromObservableFunction(self):
+        @ObservableCallable
+        def func():
+            self.buf.append('func')
+        a = Foo('a', self.buf)
+        func.addObserver(a.bar)
+        del a
+        func()
+        self.assertEqual(self.buf, ['func'])
+
 
 if __name__ == "__main__":
     unittest.main()
