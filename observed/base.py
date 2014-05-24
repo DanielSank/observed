@@ -2,13 +2,36 @@ import weakref
 import functools
 
 
-class CallbackManager(object):
+class ObservableCallable(object):
     """
-    Other objects (callables) can sign up to be notified when I am called.
+    A proxy for a callable which can be observed.
+    
+    I wrap a function or bound method, and allow orhter callables to subscribe
+    to be called whenever I am called.
+    
+    I provide the wrapped function (or method) with two methods which allow
+    other functions (or methods) to sign up for callbacks:
+    
+    addObserver(observer)
+        registers observer to be called whenever I am called
+    
+    discardObserver(observer)
+        discards observer from the set of callbacks
+    
+    I also implement __get__ and __set__ so that I can wrap methods. Note that
+    I have only been tested to work with bound methods, and functionality with
+    @classmethods or @staticmethods is not attempted.
     """
 
-    def __init__(self):
+    def __init__(self, func, obj=None):
+        self.func = func
+        functools.update_wrapper(self, func)
+        self.inst = weakref.ref(obj) if obj else None
         self.callbacks = {} #observing object ID -> weak ref, info
+        # When acting as a descriptor, we need a dict of instances
+        self.instances = {} # instance id -> (inst weak ref, ObservableCallable)
+
+    # Callback management
 
     def addObserver(self, observer):
         """
@@ -23,11 +46,11 @@ class CallbackManager(object):
         which make this inconvenient.
         """
         if hasattr(observer, "__self__"):
-            self.addBoundMethod(observer)
+            self._addBoundMethod(observer)
         else:
-            self.addFunction(observer)
+            self._addFunction(observer)
 
-    def addBoundMethod(self, boundMethod):
+    def _addBoundMethod(self, boundMethod):
         obj = boundMethod.__self__
         objID = id(obj)
         name = boundMethod.__name__
@@ -39,7 +62,7 @@ class CallbackManager(object):
             self.callbacks[objID] = (wr, s)
         s.add(name)
 
-    def addFunction(self, func):
+    def _addFunction(self, func):
         objID = id(func)
         if objID not in self.callbacks:
             wr = weakref.ref(func, CleanupHandler(objID, self.callbacks))
@@ -61,24 +84,6 @@ class CallbackManager(object):
             if id(obj) in self.callbacks:
                 del self.callbacks[objID]
 
-
-class ObservableCallable(CallbackManager):
-    """
-    A proxy for a callable which can be observed.
-    
-    I behave like a function or bound method, but other callables can
-    subscribe to be called whenever I am called.
-    """
-
-    def __init__(self, func, obj=None):
-        self.func = func
-        functools.update_wrapper(self, func)
-        self.inst = weakref.ref(obj) if obj else None
-        CallbackManager.__init__(self)
-        
-        # When acting as a descriptor, keep dict of instances
-        self.instances = {} # instance id -> (inst weak ref, ObservableCallable)
-
     def __call__(self, *arg, **kw):
         """
         Invoke the callable which I proxy, and all of it's callbacks.
@@ -99,6 +104,9 @@ class ObservableCallable(CallbackManager):
             else:
                 obj(*arg, **kw)
         return result
+
+    # Partial implementation of bound method behavior.
+    # Only for cases where we _are_ a bound method!
 
     @property
     def __self__(self):
@@ -144,6 +152,28 @@ class ObservableCallable(CallbackManager):
 
 
 def event(func):
+    """
+    I turn a function in something that can be observed.
+    
+    Use me as a decorator on a function or method, like this:
+    
+    @event
+    def my_func(x):
+        print("my_func called with arg: %s"%(x,))
+    
+    Now other functions can sign up to get notified when my_func is called:
+    
+    def callback(x):
+        print("callback called with arg: %s"%(x,))
+    
+    my_func.addObserver(callback)
+    my_func('banana')
+    >>> my_func called with arg: banana
+    >>> callback called with arg: banana
+    
+    You can decorate methods in the same way, and you can sign up bound methods
+    as callbacks.
+    """
     return ObservableCallable(func)
 
 
