@@ -12,7 +12,7 @@ class ObservableCallable(object):
     def __init__(self, func, obj=None):
         self.func = func
         functools.update_wrapper(self, func)
-        self.objectWeakRef = weakref.ref(obj) if obj else None
+        self.inst = weakref.ref(obj) if obj else None
         self.callbacks = {}  #observing object ID -> weak ref, methodNames
 
     def addObserver(self, observer):
@@ -73,8 +73,8 @@ class ObservableCallable(object):
         The callbacks are called with the same *args and **kw as the main
         callable.
         """
-        if self.objectWeakRef:
-            result = self.func(self.objectWeakRef(), *arg, **kw)
+        if self.inst:
+            result = self.func(self.inst(), *arg, **kw)
         else:
             result = self.func(*arg, **kw)
         for ID in self.callbacks:
@@ -95,8 +95,8 @@ class ObservableCallable(object):
         This is needed so that ObservableCallable instances can observe other
         ObservableCallable instances.
         """
-        if self.objectWeakRef:
-            return self.objectWeakRef()
+        if self.inst:
+            return self.inst()
         else:
             msg = "'function' object has no attribute '__self__'"
             raise AttributeError(msg)
