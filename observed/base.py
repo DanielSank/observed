@@ -39,7 +39,7 @@ class ObservableCallable(object):
         if objID in self.callbacks:
             s = self.callbacks[objID][1]
         else:
-            wr = weakref.ref(obj, Cleanup(objID, self.callbacks))
+            wr = weakref.ref(obj, CleanupHandler(objID, self.callbacks))
             s = set()
             self.callbacks[objID] = (wr, s)
         s.add(name)
@@ -47,7 +47,7 @@ class ObservableCallable(object):
     def addFunction(self, func):
         objID = id(func)
         if objID not in self.callbacks:
-            wr = weakref.ref(func, Cleanup(objID, self.callbacks))
+            wr = weakref.ref(func, CleanupHandler(objID, self.callbacks))
             self.callbacks[objID] = (wr, None)
 
     def discardObserver(self, observer):
@@ -124,7 +124,7 @@ class ObservableMethodDescriptor(object):
                 msg = "Object id %d should have been cleaned up"%(ID,)
                 raise RuntimeError(msg)
         else:
-            wr = weakref.ref(inst, Cleanup(ID, self.instances))
+            wr = weakref.ref(inst, CleanupHandler(ID, self.instances))
             om = ObservableCallable(self._func, inst)
             self.instances[ID] = (wr, om)
         return om
@@ -137,7 +137,7 @@ def event(func):
     return ObservableMethodDescriptor(func)
 
 
-class Cleanup(object):
+class CleanupHandler(object):
     """
     I manage removal of weak references from dicts.
 
