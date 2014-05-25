@@ -81,7 +81,9 @@ Documentation
 -------------
 
 Basic usage is illustrated at the top of this file. Further examples are
-given in ./observed/usage.py
+given in ./observed/example.py
+
+The source code is documented. Docstrings are required in contributions.
 
 
 Development
