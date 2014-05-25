@@ -18,14 +18,17 @@ class ObservableCallable(object):
     discardObserver(observer)
         discards observer from the set of callbacks
     
-    Note that I implement __get__ and __set__. This makes me a descriptor and I
-    use this so that I can wrap methods.
-    I have only been tested to work with bound methods, and functionality with
-    @classmethods or @staticmethods is not attempted.
+    Note that I implement __get__ and __set__. This makes me a descriptor. I
+    use this so that I can wrap methods. However, I have only been tested to
+    work with bound methods, and functionality with @classmethods or
+    @staticmethods is not attempted.
     """
 
     def __init__(self, func, obj=None):
         self.func = func
+        # Update various attributes to look like func.
+        # This is actually probably not what we want when we're acting as a
+        # descriptor. Not sure how to fix this.
         functools.update_wrapper(self, func)
         self.inst = weakref.ref(obj) if obj else None
         self.callbacks = {} #observing object ID -> weak ref, info
@@ -34,56 +37,67 @@ class ObservableCallable(object):
 
     # Callback management
 
-    def addObserver(self, observer):
+    def addObserver(self, observer, identifyCaller=False):
         """
         Register an observer to observe me.
 
         The observing function or method will be called whenever I am called,
-        and with the same arguments and keyword arguments. If a bound method
-        or function has already been registered to as a callback, trying to add
-        it again does nothing. In other words, there is no way to sign up an
-        observer to be called back multiple times. This was a conscious design
-        choice which users are invited to complain about if there are use cases
-        which make this inconvenient.
+        and with the same arguments and keyword arguments.
+        
+        if identifyCaller is True, then the observed object will pass itself
+        as an additional first argument to the callback.
+        
+        If a bound method or function has already been registered to as a
+        callback, trying to add it again does nothing. In other words, there is
+        no way to sign up an observer to be called back multiple times. This
+        was a conscious design choice which users are invited to complain about
+        if there are use cases which make this inconvenient.
         """
         if hasattr(observer, "__self__"):
-            self._addBoundMethod(observer)
+            self._addBoundMethod(observer, identifyCaller)
         else:
-            self._addFunction(observer)
+            self._addFunction(observer, identifyCaller)
 
-    def _addBoundMethod(self, boundMethod):
-        obj = boundMethod.__self__
-        objID = id(obj)
-        name = boundMethod.__name__
+    def _addBoundMethod(self, boundMethod, identifyCaller):
+        observerInst = boundMethod.__self__
+        methodName = boundMethod.__name__
+        objID = id(observerInst)
         if objID in self.callbacks:
-            s = self.callbacks[objID][1]
+            s = self.callbacks[objID][2]
         else:
-            wr = weakref.ref(obj, CleanupHandler(objID, self.callbacks))
-            s = set()
-            self.callbacks[objID] = (wr, s)
-        s.add(name)
+            wr = weakref.ref(observerInst,
+                             CleanupHandler(objID, self.callbacks))
+            s = {} # method name -> information
+            self.callbacks[objID] = (wr, 'bound_method', s)
+        s[methodName] = (identifyCaller,)
 
-    def _addFunction(self, func):
+    def _addFunction(self, func, identifyCaller):
         objID = id(func)
         if objID not in self.callbacks:
             wr = weakref.ref(func, CleanupHandler(objID, self.callbacks))
-            self.callbacks[objID] = (wr, None)
+            self.callbacks[objID] = (wr, 'function', (identifyCaller,))
 
     def discardObserver(self, observer):
         """
         Un-register an observer.
+        
+        Returns true if an observer was removed, False otherwise.
         """
+        discarded = False
         if hasattr(observer, "__self__"):  # bound method
             objID = id(observer.__self__)
             if objID in self.callbacks:
-                s = self.callbacks[objID][1]
-                s.discard(observer.__name__)
+                discarded = True
+                s = self.callbacks[objID][2]
+                del s[observer.__name__]
                 if len(s) == 0:
                     del self.callbacks[objID]
         else:  # regular function
-            objID = id(obj)
-            if id(obj) in self.callbacks:
+            objID = id(observer)
+            if objID in self.callbacks:
+                discarded = True
                 del self.callbacks[objID]
+        return discarded
 
     def __call__(self, *arg, **kw):
         """
@@ -91,19 +105,40 @@ class ObservableCallable(object):
 
         The callbacks are called with the same *args and **kw as the main
         callable.
+        
+        Note:
+        I think it is possible for observers to disappear while we execute
+        callbacks. It might be better to make strong references to all
+        observers before we start callback execution.
         """
+        caller = self.inst() if self.inst else self
+        # Call main function or method (ie. the one we wrap)
         if self.inst:
             result = self.func(self.inst(), *arg, **kw)
         else:
             result = self.func(*arg, **kw)
+        # Call callbacks
         for ID in self.callbacks:
-            wr, info = self.callbacks[ID]
-            obj = wr()
-            if info:
+            wr, callbackType, info = self.callbacks[ID]
+            observer = wr()
+            if callbackType == 'function':
+                identifyCaller, = info
+                callback = observer
+                if identifyCaller:
+                    callback(caller, *arg, **kw)
+                else:
+                    callback(*arg, **kw)
+            elif callbackType == 'bound_method':
                 for methodName in info:
-                    getattr(obj, methodName)(*arg, **kw)
+                    identifyCaller, = info[methodName]
+                    callback = getattr(observer, methodName)
+                    if identifyCaller:
+                        callback(caller, *arg, **kw)
+                    else:
+                        callback(*arg, **kw)
             else:
-                obj(*arg, **kw)
+                msg = "Callback type %s not recognized"%(callbackType,)
+                raise RuntimeError(msg)
         return result
 
     # Partial implementation of bound method behavior.
