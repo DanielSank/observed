@@ -25,7 +25,7 @@ a.bar('baz')
 
 >>> Object a invoked bar with arg='baz'
 >>> Object b invoked bar with arg='baz'
->>> "callback was invoked with arg='baz'
+>>> callback was invoked with arg='baz'
 
 This example is included in ./observed/example.py.
 
