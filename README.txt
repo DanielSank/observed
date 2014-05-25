@@ -27,7 +27,7 @@ a.bar('baz')
 >>> Object b invoked bar with arg='baz'
 >>> "callback was invoked with arg='baz'
 
-This example is included in ./observed.usage.py.
+This example is included in ./observed/example.py.
 
 This functionality is useful when connecting back-end logic to a GUI. By
 using the @event decorator, the back-end class doesn't have to know
