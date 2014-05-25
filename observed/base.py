@@ -4,13 +4,13 @@ import functools
 
 class ObservableCallable(object):
     """
-    A proxy for a callable which can be observed.
+    A callable (function or bound method) which can be observed.
     
-    I wrap a function or bound method, and allow orhter callables to subscribe
+    I wrap a function or bound method, and allow other callables to subscribe
     to be called whenever I am called.
     
-    I provide the wrapped function (or method) with two methods which allow
-    other functions (or methods) to sign up for callbacks:
+    Observers (ie. callbacks) are added and removed from me through the
+    following two methods:
     
     addObserver(observer)
         registers observer to be called whenever I am called
@@ -18,7 +18,8 @@ class ObservableCallable(object):
     discardObserver(observer)
         discards observer from the set of callbacks
     
-    I also implement __get__ and __set__ so that I can wrap methods. Note that
+    Note that I implement __get__ and __set__. This makes me a descriptor and I
+    use this so that I can wrap methods.
     I have only been tested to work with bound methods, and functionality with
     @classmethods or @staticmethods is not attempted.
     """
@@ -153,7 +154,7 @@ class ObservableCallable(object):
 
 def event(func):
     """
-    I turn a function in something that can be observed.
+    I turn a callable into something that can be observed by other callables.
     
     Use me as a decorator on a function or method, like this:
     
