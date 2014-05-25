@@ -47,10 +47,15 @@ Notable features include:
 Installation
 ------------
 
-1. Unpack the source distribution.
-2. Navigate to the root directory of the unpacked distribution.
-3. At command prompt:
-      python setup.py install
+
+pip install observed
+
+or
+
+Unpack the source distribution.
+Navigate to the root directory of the unpacked distribution.
+At command prompt:
+  python setup.py install
 
 
 News
@@ -70,7 +75,7 @@ Downloading
 
 observed can be obtained from the python package index
 
-https://pypi.python.org/pypi/observed (Not quite yet)
+https://pypi.python.org/pypi/observed
 
 or via git
 
