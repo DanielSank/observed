@@ -18,5 +18,6 @@ b = Foo('b')
 # Sign up b.bar and callback to "observe" a.bar
 a.bar.addObserver(b.bar)
 a.bar.addObserver(callback)
-# Now when we call a.bar, b.bar will be invoked with the same arguments
+# Now when we call a.bar, b.bar and callback will be invoked with the same
+# arguments
 a.bar('baz')
