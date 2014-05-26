@@ -2,7 +2,24 @@
 other functions or methods::
 
     from observed import event
+    
+    @event
+    def observed_func(arg):
+        print("observed_func: %s"%(arg,))
+    
+    def observer_func(arg):
+        print("observer_func: %s"%(arg,))
+    
+    observed_func.addObserver(observer_func)
+    observed_func('banana')
+    
+    >>> observed_func: banana
+    >>> observer_func: banana
 
+You can also register observers for bound methods::
+
+    from observed import event
+    
     class Foo(object):
         def __init__(self, name):
             self.name = name
@@ -10,11 +27,10 @@ other functions or methods::
         @event
         def bar(self, arg):
             print("Object %s invoked bar with arg='%s'"%(self.name,arg))
-
-
+    
     def callback(arg):
         print("callback was invoked with arg='%s'"%(arg,))
-
+    
     a = Foo('a')
     b = Foo('b')
     # Sign up b.bar and callback to "observe" a.bar
@@ -23,14 +39,14 @@ other functions or methods::
     # Now when we call a.bar, b.bar and callback will be invoked with
     # the same arguments
     a.bar('baz')
-
+    
     >>> Object a invoked bar with arg='baz'
     >>> Object b invoked bar with arg='baz'
     >>> callback was invoked with arg='baz'
 
 This example is included in ./observed/example.py.
 
-You can also ask that the observed object pass itself as the first argument
+You can ask that the observed object pass itself as the first argument
 whenever it calls observers::
 
     from observed import event
@@ -67,10 +83,9 @@ Installation
 
 or
 
-* Unpack the source distribution.
-* Navigate to the root directory of the unpacked distribution.
-* At command prompt:
-
+Unpack the source distribution,
+navigate to the root directory of the unpacked distribution,
+and at the command prompt:
 ::
 
     python setup.py install
