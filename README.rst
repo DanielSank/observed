@@ -1,5 +1,5 @@
 observed allows you to to sign up functions or methods to "observe" other
-functions or methods:::
+functions or methods::
 
     from observed import event
 
@@ -30,35 +30,35 @@ functions or methods:::
 This example is included in ./observed/example.py.
 
 You can also ask that the observed object pass itself as the first argument
-whenever it calls observers:
+whenever it calls observers::
 
-from observed import event
+    from observed import event
 
-@event
-def observed_func():
-    print("observed_func: I was called")
+    @event
+    def observed_func():
+        print("observed_func: I was called")
 
-def observer_func(observed):
-    print("observer_func: %s called me"%(observed.__name__,))
+    def observer_func(observed):
+        print("observer_func: %s called me"%(observed.__name__,))
 
-observed_func.addObserver(observer_func, identifyObserved=True)
-observed_func()
+    observed_func.addObserver(observer_func, identifyObserved=True)
+    observed_func()
 
->>> observed_func: I was called
->>> observer_func: observed_func called me
+    >>> observed_func: I was called
+    >>> observer_func: observed_func called me
 
 Notable features include:
 
-1. Being an observer does not keep an object alive. In other words, the
-   observer code does not keep any strong references to objects which
-   have signed up as observers.
-2. The @event decorator can be used with unhashable types, and can be
-   used on an arbitrary number of methods in each class.
-3. Tests included :)
+* Being an observer does not keep an object alive. In other words, the
+  observer code does not keep any strong references to objects which
+  have signed up as observers.
+* The @event decorator can be used with unhashable types, and can be
+  used on an arbitrary number of methods in each class.
+* Tests included :)
 
 
 Installation
-------------
+============
 
 pip install observed
 
@@ -71,19 +71,19 @@ At command prompt:
 
 
 News
-----
+====
 
 See the file NEWS for the user-visible changes from previous releases.
 
 
 License
-------
+=======
 
 observed is free (as in beer) software.  See the LICENSE file.
 
 
 Downloading
------------
+===========
 
 observed can be obtained from the python package index
 
@@ -95,7 +95,7 @@ https://github.com/DanielSank/observed.git
 
 
 Documentation
--------------
+=============
 
 Basic usage is illustrated at the top of this file. Further examples are
 given in ./observed/example.py
@@ -104,14 +104,14 @@ The source code is documented. Docstrings are required in contributions.
 
 
 Development
------------
+===========
 
 observed development is hosted on github. The current working repository
 is given in the Downloading section above.
 
 
 Bug Reporting
--------------
+=============
 
 Please submit bug tickets on the github tracking system
 
