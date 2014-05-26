@@ -92,11 +92,11 @@ Downloading
 
 observed can be obtained from the python package index
 
-https://pypi.python.org/pypi/observed
+`https://pypi.python.org/pypi/observed <https://pypi.python.org/pypi/observed/>`_
 
 or via git
 
-https://github.com/DanielSank/observed.git
+`https://github.com/DanielSank/observed.git <https://github.com/DanielSank/observed.git/>`_
 
 
 Documentation
