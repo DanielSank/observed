@@ -59,15 +59,14 @@ Notable features include:
 
 Installation
 ============
-
-pip install observed
+::
+    pip install observed
 
 or
 
-Unpack the source distribution.
-Navigate to the root directory of the unpacked distribution.
-At command prompt:
-  python setup.py install
+* Unpack the source distribution.
+* Navigate to the root directory of the unpacked distribution.
+* At command prompt: `python setup.py install`
 
 
 News
