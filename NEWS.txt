@@ -1,2 +1,7 @@
+24 May 2014
+ Can now use @event on functions and bound methods.
+ Released 0.2.2. First release on PyPI.
+
+
 15 May 2014
-Project created.
+ Project created.
