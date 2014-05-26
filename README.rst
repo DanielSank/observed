@@ -49,11 +49,12 @@ whenever it calls observers::
 
 Notable features include:
 
-* Being an observer does not keep an object alive. In other words, the
-  observer code does not keep any strong references to objects which
-  have signed up as observers.
-* The @event decorator can be used with unhashable types, and can be
-  used on an arbitrary number of methods in each class.
+* A function or bound method is not kept alive just because it is
+  observing something else. This is because the observed object does
+  not keep any strong references to the observing objects.
+* The @event decorator can be used on methods in classes which are
+  unhashable types, and can be used on an arbitrary number of
+  methods in each class.
 * Tests included :)
 
 
