@@ -70,6 +70,7 @@ or
 * Unpack the source distribution.
 * Navigate to the root directory of the unpacked distribution.
 * At command prompt:
+
 ::
 
     python setup.py install
