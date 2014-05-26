@@ -60,7 +60,6 @@ Notable features include:
 Installation
 ------------
 
-
 pip install observed
 
 or

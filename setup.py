@@ -15,7 +15,7 @@ from distutils.core import setup
 setup(name='observed',
       packages = ['observed'],
       version = version,
-      description='Observer pattern for bound methods',
+      description='Observer pattern for functions and bound methods',
       author='Daniel Sank',
       author_email='sank.daniel@gmail.com',
       url='https://github.com/DanielSank/observed',
