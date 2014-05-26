@@ -1,4 +1,9 @@
 25 May 2014
+ v0.3
+ Bumped sub-major version number because of functionality added in previous version.
+ README now shows up properly in PyPI
+
+25 May 2014
  v0.2.4:
  Optional argument identifyObserved now allows observers to receive the
  observed object as the first argument when being called.
