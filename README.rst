@@ -1,5 +1,5 @@
-observed allows you to to sign up functions or methods to "observe" other
-functions or methods::
+**observed** allows you to to sign up functions or methods to "observe"
+other functions or methods::
 
     from observed import event
 
