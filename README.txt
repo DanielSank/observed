@@ -29,10 +29,23 @@ a.bar('baz')
 
 This example is included in ./observed/example.py.
 
-This functionality is useful when connecting back-end logic to a GUI. By
-using the @event decorator, the back-end class doesn't have to know
-anything about the GUI objects which are observing it. This kind of loose
-coupling makes your program much easier to organize and maintain.
+You can also ask that the observed object pass itself as the first argument
+whenever it calls observers:
+
+from observed import event
+
+@event
+def observed_func():
+    print("observed_func: I was called")
+
+def observer_func(observed):
+    print("observer_func: %s called me"%(observed.__name__,))
+
+observed_func.addObserver(observer_func, identifyObserved=True)
+observed_func()
+
+>>> observed_func: I was called
+>>> observer_func: observed_func called me
 
 Notable features include:
 
