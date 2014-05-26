@@ -1,31 +1,31 @@
 observed allows you to to sign up functions or methods to "observe" other
-functions or methods:
+functions or methods:::
 
-from observed import event
+    from observed import event
 
-class Foo(object):
-    def __init__(self, name):
-        self.name = name
-    
-    @event
-    def bar(self, arg):
-        print("Object %s invoked bar with arg='%s'"%(self.name,arg))
+    class Foo(object):
+        def __init__(self, name):
+            self.name = name
+        
+        @event
+        def bar(self, arg):
+            print("Object %s invoked bar with arg='%s'"%(self.name,arg))
 
 
-def callback(arg):
-    print("callback was invoked with arg='%s'"%(arg,))
+    def callback(arg):
+        print("callback was invoked with arg='%s'"%(arg,))
 
-a = Foo('a')
-b = Foo('b')
-# Sign up b.bar and callback to "observe" a.bar
-a.bar.addObserver(b.bar)
-a.bar.addObserver(callback)
-# Now when we call a.bar, b.bar will be invoked with the same arguments
-a.bar('baz')
+    a = Foo('a')
+    b = Foo('b')
+    # Sign up b.bar and callback to "observe" a.bar
+    a.bar.addObserver(b.bar)
+    a.bar.addObserver(callback)
+    # Now when we call a.bar, b.bar will be invoked with the same arguments
+    a.bar('baz')
 
->>> Object a invoked bar with arg='baz'
->>> Object b invoked bar with arg='baz'
->>> callback was invoked with arg='baz'
+    >>> Object a invoked bar with arg='baz'
+    >>> Object b invoked bar with arg='baz'
+    >>> callback was invoked with arg='baz'
 
 This example is included in ./observed/example.py.
 
