@@ -120,4 +120,4 @@ Bug Reporting
 
 Please submit bug tickets on the github tracking system
 
-https://github.com/DanielSank/observed/issues
+`https://github.com/DanielSank/observed/issues <https://github.com/DanielSank/observed/issues/>`_
