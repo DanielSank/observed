@@ -18,12 +18,20 @@ class Foo(object):
     def baz(self):
         self.buf.append("%sbaz"%(self.name,))
     
-    def milton(self, caller):
-        self.buf.append("%smilton%s"%(self.name, caller.__name__))
-    
     @event
+    def milton(self, caller):
+        if hasattr(caller, 'name'):
+            name = caller.name
+        else:
+            name = caller.__name__
+        self.buf.append("%smilton%s"%(self.name, name))
+    
     def waldo(self, caller):
-        self.buf.append("%swaldo%s"%(self.name, caller.__name__))
+        if hasattr(caller, 'name'):
+            name = caller.name
+        else:
+            name = caller.__name__
+        self.buf.append("%swaldo%s"%(self.name, name))
 
 
 def makeObservedDict(*objects):
@@ -31,7 +39,7 @@ def makeObservedDict(*objects):
     for obj in objects:
         if isinstance(obj, Foo):
             result.append((obj.name+'.bar', getattr(obj, "bar")))
-            result.append((obj.name+'.waldo', getattr(obj, "waldo")))
+            result.append((obj.name+'.milton', getattr(obj, "milton")))
         else:
             result.append((obj.__name__, obj))
     return dict(result)
@@ -44,6 +52,7 @@ def makeObserverDict(*objects):
             result.append((obj.name+'.bar', getattr(obj, "bar")))
             result.append((obj.name+'.baz', getattr(obj, "baz")))
             result.append((obj.name+'.milton', getattr(obj, "milton")))
+            result.append((obj.name+'.waldo', getattr(obj, "waldo")))
         else:
             result.append((obj.__name__, obj))
     return dict(result)
@@ -66,20 +75,28 @@ class Test(unittest.TestCase):
     def test_callbacks(self):
         """
         Test all combinations of types acting as observed and observer.
+        
+        Also test identification of caller.
         """
         # Items is a tuple of (observed, [observers], expected buf)
         items = [('a.bar',
-                    ['b.baz'],
-                    ['abar', 'bbaz']),
+                  [('b.baz', False)],
+                  ['abar', 'bbaz']),
                  ('a.bar',
-                    ['b.bar', 'b.baz'],
-                    ['abar', 'bbar', 'bbaz']),
+                  [('b.bar', False), ('b.baz', False)],
+                  ['abar', 'bbar', 'bbaz']),
                  ('a.bar',
-                    ['b.bar', 'b.baz', 'f'],
-                    ['abar', 'bbar', 'bbaz', 'f']),
+                  [('b.bar', False), ('b.baz', False), ('f', False)],
+                  ['abar', 'bbar', 'bbaz', 'f']),
                  ('f',
-                    ['b.bar', 'b.baz', 'a.bar'],
-                    ['abar', 'bbar', 'bbaz', 'f'])
+                  [('b.bar', False), ('b.baz', False), ('a.bar', False)],
+                  ['abar', 'bbar', 'bbaz', 'f']),
+                 ('a.bar',
+                  [('b.milton', True), ('b.waldo', True)],
+                  ['abar', 'bmiltona', 'bwaldoa']),
+                 ('f',
+                  [('b.milton', True), ('b.baz', False)],
+                  ['bbaz', 'bmiltonf', 'f'])
                 ]
         
         for observedStr, observerStrs, expected in items:
@@ -90,13 +107,18 @@ class Test(unittest.TestCase):
             def f():
                 self.buf.append('f')
             
+            @event
+            def g(caller):
+                self.buf.append('g%s'%(caller,))
+            
             observedThings = makeObservedDict(a, b, f)
-            observerThings = makeObserverDict(a, b, f)
+            observerThings = makeObserverDict(a, b, f, g)
 
             observed = observedThings[observedStr]
-            for observerStr in observerStrs:
+            for observerStr, identifyObserved in observerStrs:
                 observer = observerThings[observerStr]
-                observed.addObserver(observer)
+                observed.addObserver(observer,
+                    identifyObserved=identifyObserved)
             observed()
             del observed, observer, observerThings, observedThings
             self.buf.sort()
@@ -134,8 +156,8 @@ class Test(unittest.TestCase):
         def g(caller):
             self.buf.append('g%s'%(caller.__name__,))
         
-        f.addObserver(g, identifyCaller=True)
-        f.addObserver(a.milton, identifyCaller=True)
+        f.addObserver(g, identifyObserved=True)
+        f.addObserver(a.milton, identifyObserved=True)
         f()
         self.buf.sort()
         self.assertEqual(self.buf, ['amiltonf','f', 'gf'])

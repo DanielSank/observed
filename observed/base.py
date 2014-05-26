@@ -37,14 +37,14 @@ class ObservableCallable(object):
 
     # Callback management
 
-    def addObserver(self, observer, identifyCaller=False):
+    def addObserver(self, observer, identifyObserved=False):
         """
         Register an observer to observe me.
 
         The observing function or method will be called whenever I am called,
         and with the same arguments and keyword arguments.
         
-        if identifyCaller is True, then the observed object will pass itself
+        if identifyObserved is True, then the observed object will pass itself
         as an additional first argument to the callback.
         
         If a bound method or function has already been registered to as a
@@ -54,9 +54,9 @@ class ObservableCallable(object):
         if there are use cases which make this inconvenient.
         """
         if hasattr(observer, "__self__"):
-            self._addBoundMethod(observer, identifyCaller)
+            self._addBoundMethod(observer, identifyObserved)
         else:
-            self._addFunction(observer, identifyCaller)
+            self._addFunction(observer, identifyObserved)
 
     def _addBoundMethod(self, boundMethod, identifyCaller):
         observerInst = boundMethod.__self__
