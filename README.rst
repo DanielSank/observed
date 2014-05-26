@@ -69,7 +69,10 @@ or
 
 * Unpack the source distribution.
 * Navigate to the root directory of the unpacked distribution.
-* At command prompt: :code:`python setup.py install`
+* At command prompt:
+::
+
+    python setup.py install
 
 
 News
