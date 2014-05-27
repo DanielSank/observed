@@ -77,18 +77,11 @@ Notable features include:
 
 Installation
 ============
-::
 
-    pip install observed
-
-or
-
-Unpack the source distribution,
-navigate to the root directory of the unpacked distribution,
-and at the command prompt:
-::
-
-    python setup.py install
+**observed** exists on the python package index, so you can do
+``pip install observed`` to install it. Alternatively, you can
+download the source distribution and in the root directory of the
+distribution do ``python setup.py install``.
 
 
 News
