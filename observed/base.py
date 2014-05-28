@@ -12,10 +12,10 @@ class ObservableCallable(object):
     Observers (ie. callbacks) are added and removed from me through the
     following two methods:
     
-    addObserver(observer)
+    add_observer(observer)
         registers observer to be called whenever I am called
     
-    discardObserver(observer)
+    discard_observer(observer)
         discards observer from the set of callbacks
     
     Note that I implement __get__ and __set__. This makes me a descriptor. I
@@ -37,14 +37,14 @@ class ObservableCallable(object):
 
     # Callback management
 
-    def addObserver(self, observer, identifyObserved=False):
+    def add_observer(self, observer, identify_observed=False):
         """
         Register an observer to observe me.
 
         The observing function or method will be called whenever I am called,
         and with the same arguments and keyword arguments.
         
-        if identifyObserved is True, then the observed object will pass itself
+        if identify_observed is True, then the observed object will pass itself
         as an additional first argument to the callback.
         
         If a bound method or function has already been registered to as a
@@ -54,30 +54,30 @@ class ObservableCallable(object):
         if there are use cases which make this inconvenient.
         """
         if hasattr(observer, "__self__"):
-            self._addBoundMethod(observer, identifyObserved)
+            self._add_bound_method(observer, identify_observed)
         else:
-            self._addFunction(observer, identifyObserved)
+            self._add_function(observer, identify_observed)
 
-    def _addBoundMethod(self, boundMethod, identifyCaller):
-        observerInst = boundMethod.__self__
-        methodName = boundMethod.__name__
-        objID = id(observerInst)
+    def _add_bound_method(self, bound_method, _identify_observed):
+        observer_inst = bound_method.__self__
+        method_name = bound_method.__name__
+        objID = id(observer_inst)
         if objID in self.callbacks:
             s = self.callbacks[objID][2]
         else:
-            wr = weakref.ref(observerInst,
+            wr = weakref.ref(observer_inst,
                              CleanupHandler(objID, self.callbacks))
             s = {} # method name -> information
             self.callbacks[objID] = (wr, 'bound_method', s)
-        s[methodName] = (identifyCaller,)
+        s[method_name] = (_identify_observed,)
 
-    def _addFunction(self, func, identifyCaller):
+    def _add_function(self, func, _identify_observed):
         objID = id(func)
         if objID not in self.callbacks:
             wr = weakref.ref(func, CleanupHandler(objID, self.callbacks))
-            self.callbacks[objID] = (wr, 'function', (identifyCaller,))
+            self.callbacks[objID] = (wr, 'function', (_identify_observed,))
 
-    def discardObserver(self, observer):
+    def discard_observer(self, observer):
         """
         Un-register an observer.
         
@@ -119,25 +119,25 @@ class ObservableCallable(object):
             result = self.func(*arg, **kw)
         # Call callbacks
         for ID in self.callbacks:
-            wr, callbackType, info = self.callbacks[ID]
+            wr, callback_type, info = self.callbacks[ID]
             observer = wr()
-            if callbackType == 'function':
-                identifyCaller, = info
+            if callback_type == 'function':
+                _identify_observed, = info
                 callback = observer
-                if identifyCaller:
+                if _identify_observed:
                     callback(caller, *arg, **kw)
                 else:
                     callback(*arg, **kw)
-            elif callbackType == 'bound_method':
+            elif callback_type == 'bound_method':
                 for methodName in info:
-                    identifyCaller, = info[methodName]
+                    _identify_observed, = info[methodName]
                     callback = getattr(observer, methodName)
-                    if identifyCaller:
+                    if _identify_observed:
                         callback(caller, *arg, **kw)
                     else:
                         callback(*arg, **kw)
             else:
-                msg = "Callback type %s not recognized"%(callbackType,)
+                msg = "Callback type %s not recognized"%(callback_type,)
                 raise RuntimeError(msg)
         return result
 

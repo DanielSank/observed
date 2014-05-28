@@ -34,7 +34,7 @@ class Foo(object):
         self.buf.append("%swaldo%s"%(self.name, name))
 
 
-def makeObservedDict(*objects):
+def make_observed_dict(*objects):
     result = []
     for obj in objects:
         if isinstance(obj, Foo):
@@ -45,7 +45,7 @@ def makeObservedDict(*objects):
     return dict(result)
 
 
-def makeObserverDict(*objects):
+def make_observer_dict(*objects):
     result = []
     for obj in objects:
         if isinstance(obj, Foo):
@@ -111,16 +111,16 @@ class Test(unittest.TestCase):
             def g(caller):
                 self.buf.append('g%s'%(caller,))
             
-            observedThings = makeObservedDict(a, b, f)
-            observerThings = makeObserverDict(a, b, f, g)
+            observed_things = make_observed_dict(a, b, f)
+            observer_things = make_observer_dict(a, b, f, g)
 
-            observed = observedThings[observedStr]
-            for observerStr, identifyObserved in observerStrs:
-                observer = observerThings[observerStr]
-                observed.addObserver(observer,
-                    identifyObserved=identifyObserved)
+            observed = observed_things[observedStr]
+            for observerStr, identify_observed in observerStrs:
+                observer = observer_things[observerStr]
+                observed.add_observer(observer,
+                    identify_observed=identify_observed)
             observed()
-            del observed, observer, observerThings, observedThings
+            del observed, observer, observer_things, observed_things
             self.buf.sort()
             self.assertEqual(expected, self.buf)
             del a, b
@@ -135,10 +135,10 @@ class Test(unittest.TestCase):
         def f():
             self.buf.append('f')
         
-        a.bar.addObserver(f)
-        result = a.bar.discardObserver(f)
+        a.bar.add_observer(f)
+        result = a.bar.discard_observer(f)
         self.assertEqual(result, True)
-        result = a.bar.discardObserver(f)
+        result = a.bar.discard_observer(f)
         self.assertEqual(result, False)
         a.bar()
         self.assertEqual(self.buf, ['abar'])
@@ -156,8 +156,8 @@ class Test(unittest.TestCase):
         def g(caller):
             self.buf.append('g%s'%(caller.__name__,))
         
-        f.addObserver(g, identifyObserved=True)
-        f.addObserver(a.milton, identifyObserved=True)
+        f.add_observer(g, identify_observed=True)
+        f.add_observer(a.milton, identify_observed=True)
         f()
         self.buf.sort()
         self.assertEqual(self.buf, ['amiltonf','f', 'gf'])
@@ -204,7 +204,7 @@ class Test(unittest.TestCase):
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
-        a.bar.addObserver(b.baz)
+        a.bar.add_observer(b.baz)
         self.assertEqual(len(a.bar.callbacks), 1)
         a.bar()
         del b
@@ -227,7 +227,7 @@ class Test(unittest.TestCase):
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
-        a.bar.addObserver(b.baz)
+        a.bar.add_observer(b.baz)
         self.assertEqual(len(a.bar.callbacks), 1)
         self.assertTrue(id(b) in a.bar.callbacks)
         a.bar()
@@ -239,7 +239,7 @@ class Test(unittest.TestCase):
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
-        a.bar.addObserver(b.bar)
+        a.bar.add_observer(b.bar)
         mn = a.bar.callbacks[id(b)][2]
         self.assertEqual(len(a.bar.callbacks), 1)
         self.assertEqual(len(mn), 1)
@@ -254,8 +254,8 @@ class Test(unittest.TestCase):
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
-        a.bar.addObserver(b.bar)
-        a.bar.addObserver(b.baz)
+        a.bar.add_observer(b.bar)
+        a.bar.add_observer(b.baz)
         mn = a.bar.callbacks[id(b)][2]
         self.assertEqual(len(a.bar.callbacks), 1)
         self.assertEqual(len(mn), 2)
@@ -270,7 +270,7 @@ class Test(unittest.TestCase):
             self.buf.append('func')
         
         a = Foo('a', self.buf)
-        a.bar.addObserver(func)
+        a.bar.add_observer(func)
         a.bar()
         self.assertEqual(self.buf, ['abar', 'func'])
 
@@ -279,9 +279,9 @@ class Test(unittest.TestCase):
             self.buf.append('func')
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
-        a.bar.addObserver(b.baz)
-        a.bar.addObserver(b.bar)
-        a.bar.addObserver(func)
+        a.bar.add_observer(b.baz)
+        a.bar.add_observer(b.bar)
+        a.bar.add_observer(func)
         self.assertEqual(len(a.bar.callbacks), 2) # b and func
         self.assertEqual(set(a.bar.callbacks.keys()), set([id(b), id(func)]))
         a.bar()
@@ -296,7 +296,7 @@ class Test(unittest.TestCase):
         def bunc(x):
             self.buf.append('bunc%s'%(x,))
         
-        func.addObserver(bunc)
+        func.add_observer(bunc)
         func('q')
         self.assertEqual(self.buf, ['funcq', 'buncq'])
 
@@ -305,7 +305,7 @@ class Test(unittest.TestCase):
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)
-        func.addObserver(a.baz)
+        func.add_observer(a.baz)
         func()
         self.assertEqual(self.buf, ['func', 'abaz'])
 
@@ -314,7 +314,7 @@ class Test(unittest.TestCase):
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)
-        func.addObserver(a.bar)
+        func.add_observer(a.bar)
         func()
         self.assertEqual(self.buf, ['func', 'abar'])
 
@@ -323,7 +323,7 @@ class Test(unittest.TestCase):
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)
-        func.addObserver(a.bar)
+        func.add_observer(a.bar)
         del a
         func()
         self.assertEqual(self.buf, ['func'])
