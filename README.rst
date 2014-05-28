@@ -81,7 +81,9 @@ Installation
 **observed** exists on the python package index, so you can do
 ``pip install observed`` to install it. Alternatively, you can
 download the source distribution and in the root directory of the
-distribution do ``python setup.py install``.
+distribution do
+
+``$ python setup.py install``.
 
 
 News
