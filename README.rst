@@ -1,5 +1,7 @@
 **observed** allows you to to sign up functions or methods to "observe"
-other functions or methods::
+other functions or methods:
+
+.. code:: python
 
     from observed import event
     
@@ -16,7 +18,9 @@ other functions or methods::
     >>> observed_func: banana
     >>> observer_func: banana
 
-You can also register observers for bound methods::
+You can also register observers for bound methods:
+
+.. code:: python
 
     from observed import event
     
@@ -47,7 +51,9 @@ You can also register observers for bound methods::
 This example is included in ./observed/example.py.
 
 You can ask that the observed object pass itself as the first argument
-whenever it calls observers::
+whenever it calls observers:
+
+.. code:: python
 
     from observed import event
 
