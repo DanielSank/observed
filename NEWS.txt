@@ -1,5 +1,8 @@
 28 May 2014
+ v0.4
  Reworked to be PEP8 compliant.
+ addObserver is now add_observer.
+ discardObserver is now discard_observer.
 
 25 May 2014
  v0.3
