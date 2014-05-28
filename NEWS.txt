@@ -1,3 +1,6 @@
+28 May 2014
+ Reworked to be PEP8 compliant.
+
 25 May 2014
  v0.3
  Bumped sub-major version number because of functionality added in previous version.
