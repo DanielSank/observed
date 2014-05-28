@@ -12,7 +12,7 @@ other functions or methods:
     def observer_func(arg):
         print("observer_func: %s"%(arg,))
     
-    observed_func.addObserver(observer_func)
+    observed_func.add_observer(observer_func)
     observed_func('banana')
     
     >>> observed_func: banana
@@ -38,8 +38,8 @@ You can also register observers for bound methods:
     a = Foo('a')
     b = Foo('b')
     # Sign up b.bar and callback to "observe" a.bar
-    a.bar.addObserver(b.bar)
-    a.bar.addObserver(callback)
+    a.bar.add_observer(b.bar)
+    a.bar.add_observer(callback)
     # Now when we call a.bar, b.bar and callback will be invoked with
     # the same arguments
     a.bar('baz')
@@ -64,7 +64,7 @@ whenever it calls observers:
     def observer_func(observed):
         print("observer_func: %s called me"%(observed.__name__,))
 
-    observed_func.addObserver(observer_func, identifyObserved=True)
+    observed_func.add_observer(observer_func, identify_observed=True)
     observed_func()
 
     >>> observed_func: I was called
