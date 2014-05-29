@@ -3,23 +3,39 @@ import functools
 
 
 class ObserverFunction(object):
-    def __init__(self, func):
-        self.func = weakref.ref(func)
+    """
+    
+    """
+    def __init__(self, func, observed_func, weakref_info):
+        """
+        func is the observer who will be called back.
+        
+        observed_func is the object being observed.
+        """
+        self.observed_func = observed_func
+        key, d = weakref_info
+        self.func = weakref.ref(func, CleanupHandler(key, d))
     
     def __call__(self, *arg, **kw):
-        return self.func()(*arg, **kw)
+        if self.observed_func:
+            return self.func()(self.observed_func, *arg, **kw)
+        else:
+            return self.func()(*arg, **kw)
 
 
 class ObserverBoundMethod(object):
-    def __init__(self, inst, method_name, identify_observed, weakref_info=None):
-        if weakref_info is None:
-            self.inst = inst
-        else:
-            key, d = weakref_info
-            self.inst = weakref.ref(inst, CleanupHandler(key, d)
+    def __init__(self, inst, method_name, observed_func, weakref_info):
+        self.observed_func = observed_func
+        key, d = weakref_info
+        self.inst = weakref.ref(inst, CleanupHandler(key, d))
+        self.method_name = method_name
     
     def __call__(self, *arg, **kw):
-        return self.func()(self.inst(), *arg, **kw)
+        bound_method = getattr(self.inst(), self.method_name)
+        if self.observed_func:
+            return bound_method(self.observed_func, *arg, **kw)
+        else:
+            return bound_method(*arg, **kw)
 
 
 class ObservableFunction(object):
@@ -41,9 +57,8 @@ class ObservableFunction(object):
 
     def __init__(self, func):
         """Initialize an ObservableFunction"""
-        self.func = func
-        # Update various attributes to look like func.
         functools.update_wrapper(self, func)
+        self.func = func
         self.callbacks = {} #observing object ID -> weak ref, info
 
     def add_observer(self, observer, identify_observed=False):
@@ -53,52 +68,44 @@ class ObservableFunction(object):
         The observing function or method will be called whenever I am called,
         and with the same arguments and keyword arguments.
         
-        If identify_observed is True, then the observed object will pass itself
-        as an additional first argument to the callback.
+        If identify_observed is True, then the observed function will be passed
+        as an additional first argument to the observer.
         
         If a bound method or function has already been registered to as a
         callback, trying to add it again does nothing. In other words, there is
         no way to sign up an observer to be called back multiple times. This
         was a conscious design choice which users are invited to complain about
         if there are use cases which make this inconvenient.
+        
+        Returns True if the observer was odded, False otherwise.
         """
         if hasattr(observer, "__self__"):  # observer is a bound method
-            self._add_bound_observer(observer, identify_observer)
+            result = self._add_bound_method(observer, identify_observed)
         else:  # observer is a normal function
-            self._add_function_observer(observer, identify_observer)
+            result = self._add_function(observer, identify_observed)
+        return result
 
-    def _add_bound_method(self, bound_method, identify_observer):
+    def _add_function(self, func, identify_observed):
+        key = self.make_key(func)
+        if key not in self.callbacks:
+            self.callbacks[key] = ObserverFunction(
+                func, self.func if identify_observed else None,
+                (key, self.callbacks))
+            return True
+        else:
+            return False
+
+    def _add_bound_method(self, bound_method, identify_observed):
         inst = bound_method.__self__
         method_name = bound_method.__name__
-        key = (id(inst), method_name)
+        key = self.make_key(bound_method)
         if key not in self.callbacks:
             self.callbacks[key] = ObserverBoundMethod(
-                inst, method_name, identify_observed,
-                weakref_info=(key, self.callbacks))
-
-    def _add_function(self, function, identify_caller):
-        key = id(function)
-        
-    # old
-    def _add_bound_method(self, bound_method, _identify_observed):
-        observer_inst = bound_method.__self__
-        method_name = bound_method.__name__
-        objID = id(observer_inst)
-        if objID in self.callbacks:
-            s = self.callbacks[objID][2]
+                inst, method_name, self.func if identify_observed else None,
+                (key, self.callbacks))
+            return True
         else:
-            wr = weakref.ref(observer_inst,
-                             CleanupHandler(objID, self.callbacks))
-            s = {} # method name -> information
-            self.callbacks[objID] = (wr, 'bound_method', s)
-        s[method_name] = (_identify_observed,)
-
-    def _add_function(self, func, _identify_observed):
-        objID = id(func)
-        if objID not in self.callbacks:
-            wr = weakref.ref(func, CleanupHandler(objID, self.callbacks))
-            self.callbacks[objID] = (wr, 'function', (_identify_observed,))
-    # end old
+            return False
 
     def discard_observer(self, observer):
         """
@@ -107,26 +114,26 @@ class ObservableFunction(object):
         Returns true if an observer was removed, False otherwise.
         """
         discarded = False
-        if hasattr(observer, "__self__"):  # bound method
-            objID = id(observer.__self__)
-            if objID in self.callbacks:
-                discarded = True
-                s = self.callbacks[objID][2]
-                del s[observer.__name__]
-                if len(s) == 0:
-                    del self.callbacks[objID]
-        else:  # regular function
-            objID = id(observer)
-            if objID in self.callbacks:
-                discarded = True
-                del self.callbacks[objID]
+        key = self.make_key(observer)
+        if key in self.callbacks:
+            del self.callbacks[key]
+            discarded = True
         return discarded
+
+    @staticmethod
+    def make_key(observer):
+        if hasattr(observer, "__self__"):
+            inst = observer.__self__
+            method_name = observer.__name__
+            return (id(inst), method_name)
+        else:
+            return id(observer)
 
     def __call__(self, *arg, **kw):
         """
-        Invoke the callable which I proxy, and all of it's callbacks.
+        Invoke the callable which I proxy, and all of my observers.
 
-        The callbacks are called with the same *args and **kw as the main
+        The observers are called with the same *args and **kw as the main
         callable.
         
         Note:
@@ -134,55 +141,18 @@ class ObservableFunction(object):
         callbacks. It might be better to make strong references to all
         observers before we start callback execution.
         """
-        caller = self.inst() if self.inst else self
-        # Call main function or method (ie. the one we wrap)
-        if self.inst:
-            result = self.func(self.inst(), *arg, **kw)
-        else:
-            result = self.func(*arg, **kw)
-        # Call callbacks
-        for ID in self.callbacks:
-            wr, callback_type, info = self.callbacks[ID]
-            observer = wr()
-            if callback_type == 'function':
-                _identify_observed, = info
-                callback = observer
-                if _identify_observed:
-                    callback(caller, *arg, **kw)
-                else:
-                    callback(*arg, **kw)
-            elif callback_type == 'bound_method':
-                for methodName in info:
-                    _identify_observed, = info[methodName]
-                    callback = getattr(observer, methodName)
-                    if _identify_observed:
-                        callback(caller, *arg, **kw)
-                    else:
-                        callback(*arg, **kw)
-            else:
-                msg = "Callback type %s not recognized"%(callback_type,)
-                raise RuntimeError(msg)
+        result = self.func(*arg, **kw)
+        for key in self.callbacks:
+            self.callbacks[key](*arg, **kw)
         return result
 
-    # Partial implementation of bound method behavior.
-    # Only for cases where we _are_ a bound method!
 
-    @property
-    def __self__(self):
-        """
-        Get a strong reference to the object owning this ObservableCallable
-
-        This is needed so that ObservableCallable instances can observe other
-        ObservableCallable instances.
-        """
-        if self.inst:
-            return self.inst()
-        else:
-            msg = "'function' object has no attribute '__self__'"
-            raise AttributeError(msg)
-
-    # Descriptor interface
-
+class ObservableBoundMethod(object):
+    def __init__(self, inst, func):
+        functools.update_wrapper(self, func)
+        self.inst = inst #Should this be weak?
+        self.method_name = func.__name__
+        self.callbacks = {}
 
 
 class ObservableBoundMethodManager(object):
@@ -193,30 +163,33 @@ class ObservableBoundMethodManager(object):
 
     def __get__(self, inst, cls):
         """
-        Handle access as descriptor.
+        I am a descriptor which manages observable bound methods.
         
         If accessed by class I return myself.
         
         If accessed by instance I return an ObservableBoundMethod which handles
         that instance.
-        I store no strong references to the isntances I manage.
+        I store no strong references to the instances I manage.
         """
         if inst is None:
-            return self
-        # Only weak references to instances are stored. However, we can't use
-        # a WeakKeyDict because not all instances are hashable. We handle this
-        # by using the instance's id as a key mapping to a tuple of a weak
-        # reference and the actual ObservableBoundMethod.
-        ID = id(inst)
-        if ID in self.instances:
-            wr, obm = self.instances[ID]
+            raise NotImplementedError("class access not yet supported")
+        # Only weak references to instances are stored. This garuntees that
+        # the descriptor cannot prevent the instnaces it manages from being
+        # garbage collected.
+        # We can't use a WeakKeyDict because not all instances are hashable. We
+        # handle this by using the instance's id as a key and setting up an
+        # appropriate weakref callback which fires if the instance is
+        # finalized.
+        inst_id = id(inst)
+        if inst_id in self.instances:
+            wr, obm = self.instances[inst_id]
             if not wr():
-                msg = "Object id %d should have been cleaned up"%(ID,)
+                msg = "Object id %d should have been cleaned up"%(inst_id,)
                 raise RuntimeError(msg)
         else:
-            wr = weakref.ref(inst, CleanupHandler(ID, self.instances))
-            obm = ObservableBoundMethod(self._func, inst)
-            self.instances[ID] = (wr, obm)
+            wr = weakref.ref(inst, CleanupHandler(inst_id, self.instances))
+            obm = ObservableBoundMethod(inst, self._func)
+            self.instances[inst_id] = (wr, obm)
         return obm
 
     def __set__(self, inst, val):
