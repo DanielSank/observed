@@ -148,13 +148,27 @@ class ObservableFunction(object):
 
 
 class ObservableBoundMethod(ObservableFunction):
+    """
+    I am a bound method which fires callbacks when I am called.
+    """
     def __init__(self, inst, func, callbacks):
+        """
+        inst is the object instance to which I'm bound.
+        
+        func is the function I wrap.
+        
+        callbacks is a dict shared by the ObservableBoundMethodManager which
+        created me. See the documentation for ObservableBoundMethodManager.
+        """
         self.func = func
         functools.update_wrapper(self, func)
         self.inst = inst #Should this be weak? No! Bound methods have strong references to their instances.
         self.callbacks = callbacks
     
     def __call__(self, *arg, **kw):
+        """
+        Call the function I wrap and all of my callbacks.
+        """
         result = self.func(self.inst, *arg, **kw)
         for key in self.callbacks:
             self.callbacks[key](*arg, **kw)
@@ -162,6 +176,9 @@ class ObservableBoundMethod(ObservableFunction):
     
     @property
     def __self__(self):
+        """
+        Return the instance to which I'm bound.
+        """
         return self.inst
 
 
@@ -186,13 +203,14 @@ class ObservableBoundMethodManager(object):
         """
         if inst is None:
             return self
-        # Only weak references to instances are stored. This garuntees that
-        # the descriptor cannot prevent the instnaces it manages from being
+        # Only weak references to instances are stored. This guarantees that
+        # the descriptor cannot prevent the instances it manages from being
         # garbage collected.
-        # We can't use a WeakKeyDict because not all instances are hashable. We
-        # handle this by using the instance's id as a key and setting up an
-        # appropriate weakref callback which fires if the instance is
-        # finalized.
+        # We can't use a WeakKeyDict because not all instances are hashable.
+        # Instead we use the instance's id as a key which maps to a tuple of a
+        # weak ref to the instance, and the callbacks for that instance. The
+        # weak ref has a callback set up to clear the dict entry when the
+        # instance is finalized.
         inst_id = id(inst)
         if inst_id in self.instances:
             wr, callbacks = self.instances[inst_id]
