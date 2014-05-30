@@ -151,7 +151,7 @@ class ObservableBoundMethod(ObservableFunction):
     """
     I am a bound method which fires callbacks when I am called.
     """
-    def __init__(self, inst, func, callbacks):
+    def __init__(self, func, inst, callbacks):
         """
         inst is the object instance to which I'm bound.
         
@@ -162,9 +162,9 @@ class ObservableBoundMethod(ObservableFunction):
         """
         self.func = func
         functools.update_wrapper(self, func)
-        self.inst = inst #Should this be weak? No! Bound methods have strong references to their instances.
+        self.inst = inst
         self.callbacks = callbacks
-    
+
     def __call__(self, *arg, **kw):
         """
         Call the function I wrap and all of my callbacks.
@@ -173,7 +173,7 @@ class ObservableBoundMethod(ObservableFunction):
         for key in self.callbacks:
             self.callbacks[key](*arg, **kw)
         return result
-    
+
     @property
     def __self__(self):
         """
@@ -221,7 +221,7 @@ class ObservableBoundMethodManager(object):
             wr = weakref.ref(inst, CleanupHandler(inst_id, self.instances))
             callbacks = {}
             self.instances[inst_id] = (wr, callbacks)
-        return ObservableBoundMethod(inst, self._func, callbacks)
+        return ObservableBoundMethod(self._func, inst, callbacks)
 
     def __set__(self, inst, val):
         """Disallow setting because we don't garuntee behavior."""
