@@ -6,34 +6,34 @@ class ObserverFunction(object):
     """
     
     """
-    def __init__(self, func, observed_func, weakref_info):
+    def __init__(self, func, observed_obj, weakref_info):
         """
         func is the observer who will be called back.
         
-        observed_func is the object being observed.
+        observed_obj is the object being observed.
         """
-        self.observed_func = observed_func
+        self.observed_obj = observed_obj
         key, d = weakref_info
         self.func = weakref.ref(func, CleanupHandler(key, d))
     
     def __call__(self, *arg, **kw):
-        if self.observed_func:
-            return self.func()(self.observed_func, *arg, **kw)
+        if self.observed_obj:
+            return self.func()(self.observed_obj, *arg, **kw)
         else:
             return self.func()(*arg, **kw)
 
 
 class ObserverBoundMethod(object):
-    def __init__(self, inst, method_name, observed_func, weakref_info):
-        self.observed_func = observed_func
+    def __init__(self, inst, method_name, observed_obj, weakref_info):
+        self.observed_obj = observed_obj
         key, d = weakref_info
         self.inst = weakref.ref(inst, CleanupHandler(key, d))
         self.method_name = method_name
     
     def __call__(self, *arg, **kw):
         bound_method = getattr(self.inst(), self.method_name)
-        if self.observed_func:
-            return bound_method(self.observed_func, *arg, **kw)
+        if self.observed_obj:
+            return bound_method(self.observed_obj, *arg, **kw)
         else:
             return bound_method(*arg, **kw)
 
@@ -89,7 +89,7 @@ class ObservableFunction(object):
         key = self.make_key(func)
         if key not in self.callbacks:
             self.callbacks[key] = ObserverFunction(
-                func, self.func if identify_observed else None,
+                func, self if identify_observed else None,
                 (key, self.callbacks))
             return True
         else:
@@ -101,7 +101,7 @@ class ObservableFunction(object):
         key = self.make_key(bound_method)
         if key not in self.callbacks:
             self.callbacks[key] = ObserverBoundMethod(
-                inst, method_name, self.func if identify_observed else None,
+                inst, method_name, self if identify_observed else None,
                 (key, self.callbacks))
             return True
         else:
@@ -147,32 +147,45 @@ class ObservableFunction(object):
         return result
 
 
-class ObservableBoundMethod(object):
-    def __init__(self, inst, func):
+class ObservableBoundMethod(ObservableFunction):
+    def __init__(self, inst, func, callbacks):
+        self.func = func
         functools.update_wrapper(self, func)
-        self.inst = inst #Should this be weak?
-        self.method_name = func.__name__
-        self.callbacks = {}
+        self.inst = inst #Should this be weak? No! Bound methods have strong references to their instances.
+        self.callbacks = callbacks
+    
+    def __call__(self, *arg, **kw):
+        result = self.func(self.inst, *arg, **kw)
+        for key in self.callbacks:
+            self.callbacks[key](*arg, **kw)
+        return result
+    
+    @property
+    def __self__(self):
+        return self.inst
 
 
 class ObservableBoundMethodManager(object):
+    """
+    I manage access to ObservableBoundMethods.
+    
+    I store no strong references to the instances I manage.
+    """
     def __init__(self, func):
         self._func = func
-        # instance id -> (inst weak ref, ObservableBoundMethod)
+        # instance id -> (inst weak ref, callbacks)
         self.instances = {}
 
     def __get__(self, inst, cls):
         """
-        I am a descriptor which manages observable bound methods.
-        
-        If accessed by class I return myself.
-        
         If accessed by instance I return an ObservableBoundMethod which handles
         that instance.
-        I store no strong references to the instances I manage.
+        
+        If accessed by class I return myself; this is not yet compatible with
+        how class access of a method is supposed to work.
         """
         if inst is None:
-            raise NotImplementedError("class access not yet supported")
+            return self
         # Only weak references to instances are stored. This garuntees that
         # the descriptor cannot prevent the instnaces it manages from being
         # garbage collected.
@@ -182,15 +195,15 @@ class ObservableBoundMethodManager(object):
         # finalized.
         inst_id = id(inst)
         if inst_id in self.instances:
-            wr, obm = self.instances[inst_id]
+            wr, callbacks = self.instances[inst_id]
             if not wr():
-                msg = "Object id %d should have been cleaned up"%(inst_id,)
+                msg = "Unreachable: instance id=%d not cleaned up"%(inst_id,)
                 raise RuntimeError(msg)
         else:
             wr = weakref.ref(inst, CleanupHandler(inst_id, self.instances))
-            obm = ObservableBoundMethod(inst, self._func)
-            self.instances[inst_id] = (wr, obm)
-        return obm
+            callbacks = {}
+            self.instances[inst_id] = (wr, callbacks)
+        return ObservableBoundMethod(inst, self._func, callbacks)
 
     def __set__(self, inst, val):
         """Disallow setting because we don't garuntee behavior."""
