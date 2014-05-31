@@ -13,23 +13,20 @@ class ObserverFunction(object):
         weakref_info is the information I need in order to clean myself up if
         and when my inst is garbage collected.
         """
+        # For some reason, if we put the update_wrapper after we make the
+        # weak reference to func, the call to weakref.ref returns a function
+        # instead of a weak ref. So, don't move the next line :\
+        functools.update_wrapper(self, func)
         self.observed_obj = observed_obj
         key, d = weakref_info
         self.func = weakref.ref(func, CleanupHandler(key, d))
-        functools.update_wrapper(self, func)
-        print('boogle', type(self.func))
     
     def __call__(self, *arg, **kw):
         """Call me, maybe?"""
         if self.observed_obj:
             return self.func()(self.observed_obj, *arg, **kw)
         else:
-            try:
-                return self.func()(*arg, **kw)
-            except:
-                print("self.func: %s"%(type(self.func),))
-                print("self.func(): %s"%(type(self.func()),))
-                raise
+            return self.func()(*arg, **kw)
 
 
 class ObserverBoundMethod(object):
