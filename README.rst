@@ -3,9 +3,9 @@ other functions or methods:
 
 .. code:: python
 
-    from observed import event
+    from observed import observable_function
     
-    @event
+    @observable_function
     def observed_func(arg):
         print("observed_func: %s"%(arg,))
     
@@ -22,13 +22,13 @@ You can also register observers for bound methods:
 
 .. code:: python
 
-    from observed import event
+    from observed import observable_method
     
     class Foo(object):
         def __init__(self, name):
             self.name = name
         
-        @event
+        @observable_method
         def bar(self, arg):
             print("Object %s invoked bar with arg='%s'"%(self.name,arg))
     
@@ -48,16 +48,14 @@ You can also register observers for bound methods:
     >>> Object b invoked bar with arg='baz'
     >>> callback was invoked with arg='baz'
 
-This example is included in ./observed/example.py.
-
 You can ask that the observed object pass itself as the first argument
 whenever it calls observers:
 
 .. code:: python
 
-    from observed import event
+    from observed import observable_function
 
-    @event
+    @observable_function
     def observed_func():
         print("observed_func: I was called")
 
@@ -69,6 +67,30 @@ whenever it calls observers:
 
     >>> observed_func: I was called
     >>> observer_func: observed_func called me
+
+This works exactly the same for bound methods:
+
+.. code:: python
+
+    from observed import observable_method
+
+    class Foo(object):
+        def __init__(self, name):
+            self.name = name
+        
+        @observable_method
+        def bar(self):
+            print("Object %s invoked bar"%(self.name,))
+
+    def callback(observed):
+        print("callback was invoked by='%s'"%(observed.__self__.name,))
+
+    a = Foo('a')
+    a.bar.add_observer(callback, identify_observed=True)
+    a.bar()
+
+    >>> Object a invoked bar
+    >>> callback was invoked by a
 
 Notable features include:
 
