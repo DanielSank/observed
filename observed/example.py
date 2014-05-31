@@ -1,23 +1,27 @@
-from observed import event
+from observed import observable_method, observable_function
 
 class Foo(object):
-    def __init__(self, name):
+    __init__(self, name):
         self.name = name
     
-    @event
-    def bar(self, arg):
-        print("Object %s invoked bar with arg='%s'"%(self.name, arg))
+    @observable_method
+    def bar(self, x):
+        print("%s called bar with arg: %s"%(self.name, x))
+    
+    def baz(self, x):
+        print("%s called baz with arg: %s"%(self.name, x))
 
+@observable_function
+def func(x):
+    print("func called with arg: %s"%(x,))
 
-def callback(arg):
-    print("callback was invoked with arg='%s'"%(arg,))
-
+def callback(x):
+    print("callback called with arg: %s"%(x,))
 
 a = Foo('a')
 b = Foo('b')
-# Sign up b.bar and callback to "observe" a.bar
-a.bar.add_observer(b.bar)
 a.bar.add_observer(callback)
-# Now when we call a.bar, b.bar and callback will be invoked with the same
-# arguments
-a.bar('baz')
+a.bar.add_observer(func)
+a.bar.add_observer(b.bar)
+a.bar.add_observer(b.baz)
+a.bar('banana')

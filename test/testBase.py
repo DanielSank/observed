@@ -2,8 +2,7 @@ import unittest
 import sys
 import os
 sys.path.insert(0, os.path.abspath('..'))
-from observed import event
-
+from observed.base import observable_function, observable_method
 
 class Foo(object):
     
@@ -11,24 +10,24 @@ class Foo(object):
         self.name = name
         self.buf = buf
     
-    @event
+    @observable_method
     def bar(self):
         self.buf.append("%sbar"%(self.name,))
     
     def baz(self):
         self.buf.append("%sbaz"%(self.name,))
     
-    @event
+    @observable_method
     def milton(self, caller):
-        if hasattr(caller, 'name'):
-            name = caller.name
+        if hasattr(caller, '__self__'):
+            name = caller.__self__.name
         else:
             name = caller.__name__
         self.buf.append("%smilton%s"%(self.name, name))
     
     def waldo(self, caller):
-        if hasattr(caller, 'name'):
-            name = caller.name
+        if hasattr(caller, '__self__'):
+            name = caller.__self__.name
         else:
             name = caller.__name__
         self.buf.append("%swaldo%s"%(self.name, name))
@@ -77,8 +76,17 @@ class Test(unittest.TestCase):
         Test all combinations of types acting as observed and observer.
         
         Also test identification of caller.
+        
+        Note: There is a built-in problem with the way some of these tests
+        work. I use deletion of objects to exercise the automatic cleanup
+        functionality, but this relies on CPython's reference counting in order
+        to work right. Not all implementations of python use reference
+        counting.
         """
-        # Items is a tuple of (observed, [observers], expected buf)
+        # Each item is a tuple of
+        #   (observed,
+        #   [(observer, identify_observed),...],
+        #   expected buf)
         items = [('a.bar',
                   [('b.baz', False)],
                   ['abar', 'bbaz']),
@@ -103,11 +111,11 @@ class Test(unittest.TestCase):
             a = Foo('a', self.buf)
             b = Foo('b', self.buf)
             
-            @event
+            @observable_function
             def f():
                 self.buf.append('f')
             
-            @event
+            @observable_function
             def g(caller):
                 self.buf.append('g%s'%(caller,))
             
@@ -145,11 +153,11 @@ class Test(unittest.TestCase):
 
     def test_callerIdentification(self):
         """
-        The observed object passes itself as first argument if we want.
+        The observed object can pass itself as first argument.
         """
         a = Foo('a', self.buf)
         
-        @event
+        @observable_function
         def f():
             self.buf.append('f')
         
@@ -164,7 +172,7 @@ class Test(unittest.TestCase):
 
     def test_singleObservableMethodInstance(self):
         """
-        Invoking a method decorated by @event activates the descriptor.
+        Invoking a decorated method activates the descriptor.
         
         Also check that decorated methods can be called.
         """
@@ -179,10 +187,10 @@ class Test(unittest.TestCase):
 
     def test_twoObservableMethodInstances(self):
         """
-        Invoking a method decorated by @event activates the descriptor.
+        Invoking a decorated method activates the descriptor.
         
-        If an @event is called from two different instances, they should both
-        be added to the descriptor's instance dict.
+        If the docrator is accessed from two different instances, they should
+        both be added to the descriptor's instance dict.
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
@@ -201,6 +209,8 @@ class Test(unittest.TestCase):
     def test_cleanup(self):
         """
         As observing objects disappear their entries are removed from observed.
+        
+        This won't work in non-CPython implementations of python!
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
@@ -220,52 +230,54 @@ class Test(unittest.TestCase):
     
     def test_methodCallsMethod(self):
         """
-        Normal methods observe @event methods.
+        Normal methods observe decorated methods.
         
-        Adding a normal (no @event) method as a callback causes that
-        method to run when the observed method runs.
+        Adding a normal (no decorator) method as a callback causes that method
+        to run when the observed method runs.
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
         a.bar.add_observer(b.baz)
         self.assertEqual(len(a.bar.callbacks), 1)
-        self.assertTrue(id(b) in a.bar.callbacks)
+        self.assertTrue((id(b), 'baz') in a.bar.callbacks)
         a.bar()
         self.assertEqual(self.buf, ['abar','bbaz'])
 
     def test_methodCallsObservableMethod(self):
         """
-        @event methods observe other @event methods.
+        decorated methods observe other decorated methods.
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
         a.bar.add_observer(b.bar)
-        mn = a.bar.callbacks[id(b)][2]
-        self.assertEqual(len(a.bar.callbacks), 1)
-        self.assertEqual(len(mn), 1)
-        self.assertTrue('bar' in mn)
+        cb = a.bar.callbacks
+        self.assertEqual(len(cb), 1)
+        self.assertTrue((id(b), 'bar') in cb)
         a.bar()
         self.buf.sort()
         self.assertEqual(self.buf, ['abar','bbar'])
 
     def test_methodCallsObservableMethodAndMethod(self):
         """
-        @event and normal methods simultaneously observe @event methods.
+        decorated and normal methods simultaneously observe decorated methods.
         """
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
         a.bar.add_observer(b.bar)
         a.bar.add_observer(b.baz)
-        mn = a.bar.callbacks[id(b)][2]
-        self.assertEqual(len(a.bar.callbacks), 1)
-        self.assertEqual(len(mn), 2)
-        self.assertTrue('bar' in mn)
-        self.assertTrue('baz' in mn)
+        cb = a.bar.callbacks
+        self.assertEqual(len(cb), 2)
+        ids = set(cb.keys())
+        self.assertTrue((id(b), 'bar') in ids)
+        self.assertTrue((id(b), 'baz') in ids)
         a.bar()
         self.buf.sort()
         self.assertEqual(self.buf, ['abar','bbar','bbaz'])
 
     def test_methodCallsFunction(self):
+        """
+        Function observes decorated method.
+        """
         def func():
             self.buf.append('func')
         
@@ -275,6 +287,9 @@ class Test(unittest.TestCase):
         self.assertEqual(self.buf, ['abar', 'func'])
 
     def test_methodCallsMethodAndObservableMethodAndFunction(self):
+        """
+        Method observed by function, method, and decorated method.
+        """
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)
@@ -282,14 +297,18 @@ class Test(unittest.TestCase):
         a.bar.add_observer(b.baz)
         a.bar.add_observer(b.bar)
         a.bar.add_observer(func)
-        self.assertEqual(len(a.bar.callbacks), 2) # b and func
-        self.assertEqual(set(a.bar.callbacks.keys()), set([id(b), id(func)]))
+        self.assertEqual(len(a.bar.callbacks), 3)
+        self.assertEqual(set(a.bar.callbacks.keys()),
+            set([(id(b), 'bar'), (id(b), 'baz'), id(func)]))
         a.bar()
         self.buf.sort()
         self.assertEqual(self.buf, ['abar', 'bbar', 'bbaz', 'func'])
 
     def test_functionCallsFunction(self):
-        @event
+        """
+        Function observes function.
+        """
+        @observable_function
         def func(x):
             self.buf.append('func%s'%(x,))
         
@@ -301,7 +320,10 @@ class Test(unittest.TestCase):
         self.assertEqual(self.buf, ['funcq', 'buncq'])
 
     def test_functionCallsMethod(self):
-        @event
+        """
+        Function observed by method.
+        """
+        @observable_function
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)
@@ -310,7 +332,10 @@ class Test(unittest.TestCase):
         self.assertEqual(self.buf, ['func', 'abaz'])
 
     def test_functionCallsObservableMethod(self):
-        @event
+        """
+        Function observed by decorated method.
+        """
+        @observable_function
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)
@@ -319,7 +344,10 @@ class Test(unittest.TestCase):
         self.assertEqual(self.buf, ['func', 'abar'])
 
     def test_objectCleanupFromObservableFunction(self):
-        @event
+        """
+        Observable function releases observers
+        """
+        @observable_function
         def func():
             self.buf.append('func')
         a = Foo('a', self.buf)

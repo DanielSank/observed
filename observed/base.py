@@ -4,33 +4,53 @@ import functools
 
 class ObserverFunction(object):
     """
-    
+    I am a function which observes another function or method.
     """
     def __init__(self, func, observed_obj, weakref_info):
         """
         func is the observer who will be called back.
-        
         observed_obj is the object being observed.
+        weakref_info is the information I need in order to clean myself up if
+        and when my inst is garbage collected.
         """
         self.observed_obj = observed_obj
         key, d = weakref_info
         self.func = weakref.ref(func, CleanupHandler(key, d))
+        functools.update_wrapper(self, func)
+        print('boogle', type(self.func))
     
     def __call__(self, *arg, **kw):
+        """Call me, maybe?"""
         if self.observed_obj:
             return self.func()(self.observed_obj, *arg, **kw)
         else:
-            return self.func()(*arg, **kw)
+            try:
+                return self.func()(*arg, **kw)
+            except:
+                print("self.func: %s"%(type(self.func),))
+                print("self.func(): %s"%(type(self.func()),))
+                raise
 
 
 class ObserverBoundMethod(object):
+    """
+    I am a bound method which observes another function or method.
+    """
     def __init__(self, inst, method_name, observed_obj, weakref_info):
+        """
+        inst is the object to which I am bound.
+        method_name is the name of the function I wrap.
+        observed_obj is the object I observe.
+        weakref_info is the information I need in order to clean myself up when
+        my inst is garbage collected.
+        """
         self.observed_obj = observed_obj
         key, d = weakref_info
         self.inst = weakref.ref(inst, CleanupHandler(key, d))
         self.method_name = method_name
     
     def __call__(self, *arg, **kw):
+        """call me, baby"""
         bound_method = getattr(self.inst(), self.method_name)
         if self.observed_obj:
             return bound_method(self.observed_obj, *arg, **kw)
@@ -68,8 +88,9 @@ class ObservableFunction(object):
         The observing function or method will be called whenever I am called,
         and with the same arguments and keyword arguments.
         
-        If identify_observed is True, then the observed function will be passed
-        as an additional first argument to the observer.
+        If identify_observed is True, then I will be passed as an additional
+        first argument to the observer. If I am a bound method you can
+        access the object to which I'm bound via .__self__.
         
         If a bound method or function has already been registered to as a
         callback, trying to add it again does nothing. In other words, there is
@@ -77,7 +98,7 @@ class ObservableFunction(object):
         was a conscious design choice which users are invited to complain about
         if there are use cases which make this inconvenient.
         
-        Returns True if the observer was odded, False otherwise.
+        Returns True if the observer was added, False otherwise.
         """
         if hasattr(observer, "__self__"):  # observer is a bound method
             result = self._add_bound_method(observer, identify_observed)
@@ -86,6 +107,7 @@ class ObservableFunction(object):
         return result
 
     def _add_function(self, func, identify_observed):
+        """Add a function as an observer."""
         key = self.make_key(func)
         if key not in self.callbacks:
             self.callbacks[key] = ObserverFunction(
@@ -96,6 +118,7 @@ class ObservableFunction(object):
             return False
 
     def _add_bound_method(self, bound_method, identify_observed):
+        """Add an bound method as an observer."""
         inst = bound_method.__self__
         method_name = bound_method.__name__
         key = self.make_key(bound_method)
@@ -122,6 +145,7 @@ class ObservableFunction(object):
 
     @staticmethod
     def make_key(observer):
+        """Make a suitable key for a function or bound method."""
         if hasattr(observer, "__self__"):
             inst = observer.__self__
             method_name = observer.__name__
@@ -132,7 +156,7 @@ class ObservableFunction(object):
     def __call__(self, *arg, **kw):
         """
         Invoke the callable which I proxy, and all of my observers.
-
+        
         The observers are called with the same *args and **kw as the main
         callable.
         
@@ -153,9 +177,9 @@ class ObservableBoundMethod(ObservableFunction):
     """
     def __init__(self, func, inst, callbacks):
         """
-        inst is the object instance to which I'm bound.
-        
         func is the function I wrap.
+        
+        inst is the object instance to which I'm bound.
         
         callbacks is a dict shared by the ObservableBoundMethodManager which
         created me. See the documentation for ObservableBoundMethodManager.
@@ -186,9 +210,30 @@ class ObservableBoundMethodManager(object):
     """
     I manage access to ObservableBoundMethods.
     
-    I store no strong references to the instances I manage.
+    I store no strong references to the instances I manage. This guarantees
+    that I don't prevent garbage collection of the instances I manage.
+    
+    When an instance accesses me, I create an ObservableBoundMethod for that
+    instance and return it. Observers can be added to that
+    ObservableBoundMethod, and they are persisted so that any future invokation
+    by that instance fires the callbacks.
     """
+    # We persist the callbacks here because if we try to persist them inside
+    # the ObservableBoundMethods then we have to persist the
+    # ObservableBoundMethods. That would be bad, because then the reference to
+    # the inst inside the ObservableBoundMethod would be persisted and would
+    # prevent garbage collection of the inst. We can't use a weak ref to fix
+    # this because the ObservableBoundMethod _should_ prevent garbage
+    # collection of the inst as long as the ObservableBoundMethod is alive. If
+    # this doesn't make sense draw a picture of what references what and it
+    # will become clear.
     def __init__(self, func):
+        """
+        Initialize me.
+        
+        func is the function I will give to the ObservableBoundMethods I
+        create.
+        """
         self._func = func
         # instance id -> (inst weak ref, callbacks)
         self.instances = {}
@@ -224,40 +269,14 @@ class ObservableBoundMethodManager(object):
         return ObservableBoundMethod(self._func, inst, callbacks)
 
     def __set__(self, inst, val):
-        """Disallow setting because we don't garuntee behavior."""
+        """Disallow setting because we don't guarantee behavior."""
         raise RuntimeError("Assignment not supported")
-
-
-def event(func):
-    """
-    I turn a callable into something that can be observed by other callables.
-    
-    Use me as a decorator on a function or method, like this:
-    
-    @event
-    def my_func(x):
-        print("my_func called with arg: %s"%(x,))
-    
-    Now other functions can sign up to get notified when my_func is called:
-    
-    def callback(x):
-        print("callback called with arg: %s"%(x,))
-    
-    my_func.addObserver(callback)
-    my_func('banana')
-    >>> my_func called with arg: banana
-    >>> callback called with arg: banana
-    
-    You can decorate methods in the same way, and you can sign up bound methods
-    as callbacks.
-    """
-    return ObservableCallable(func)
 
 
 class CleanupHandler(object):
     """
     I manage removal of weak references from dicts.
-
+    
     Use me as a weakref.ref callback to remove an object's id from a dict
     when that object is garbage collected.
     """
@@ -268,3 +287,71 @@ class CleanupHandler(object):
     def __call__(self, wr):
         if self.key in self.d:
             del self.d[self.key]
+
+
+def observable_function(func):
+    """
+    I turn a function into something that can be observed by other callables.
+    
+    Use me as a decorator on a function, like this:
+    
+    @observable_function
+    def my_func(x):
+        print("my_func called with arg: %s"%(x,))
+    
+    Now other functions and methods can sign up to get notified when my_func is
+    called:
+    
+    def callback(x):
+        print("callback called with arg: %s"%(x,))
+    
+    class Foo(object):
+        def bar(self, x):
+            print("Foo object's .bar called with arg: %s"%(x,))
+    
+    f = Foo()
+    my_func.add_observer(callback)
+    my_func.add_observer(f.bar)
+    my_func('banana')
+    
+    >>> my_func called with arg: banana
+    >>> callback called with arg: banana
+    >>> Foo object's .bar called with arg: banana
+    
+    To decorate methods use observable_method.
+    """
+    return ObservableFunction(func)
+
+
+def observable_method(func):
+    """
+    I turn a method into something that can be observed by other callables.
+    
+    Use me as a decorator on a method, like this:
+    
+    class Foo(object):
+        __init__(self, name):
+            self.name = name
+        
+        @observable_method
+        def bar(self, x):
+            print("%s called bar with arg: %s"%(self.name, x))
+    
+    Now other functions and methods can sign up to get notified when my_func is
+    called:
+    
+    def callback(x):
+        print("callback called with arg: %s"%(x,))
+    
+    a = Foo('a')
+    b = Foo('b')
+    a.bar.add_observer(callback)
+    a.bar.add_observer(b.bar)
+    a.bar('banana')
+    >>> a called bar with arg: banana
+    >>> b called bar with arg: banana
+    >>> callback called with arg: banana
+    
+    To decorate functions use observable_function.
+    """
+    return ObservableBoundMethodManager(func)
