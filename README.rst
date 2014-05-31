@@ -100,10 +100,15 @@ Notable features include:
 
 * A function or bound method is not kept alive just because it is
   observing something else. This is because the observed object does
-  not keep any strong references to the observing objects.
-* The @event decorator can be used on methods in classes which are
-  unhashable types, and can be used on an arbitrary number of
+  not keep any strong references to the observing objects. In CPython
+  this means that your observers are automatically detached whenever the
+  reference count to that observer goes to zero.
+* The @observable_method decorator can be used on methods in classes
+  which are unhashable types, and can be used on an arbitrary number of
   methods in each class.
+* The descriptor which handles observable_method does not paste any data
+  onto the instances it manages. There is zero chance of name collision
+  on the observed instances.
 * Tests included :)
 
 
