@@ -30,23 +30,26 @@ You can also register observers for bound methods:
         
         @observable_method
         def bar(self, arg):
-            print("Object %s invoked bar with arg='%s'"%(self.name,arg))
+            print("Object %s invoked bar with arg='%s'"%(self.name, arg))
+
+        @observable_method
+        def baz(self, arg):
+            print("Object %s invoked baz with arg='%s'"%(self.name, arg))
     
     def callback(arg):
         print("callback was invoked with arg='%s'"%(arg,))
     
     a = Foo('a')
     b = Foo('b')
-    # Sign up b.bar and callback to "observe" a.bar
     a.bar.add_observer(b.bar)
+    a.bar.add_observer(b.baz)
     a.bar.add_observer(callback)
-    # Now when we call a.bar, b.bar and callback will be invoked with
-    # the same arguments
-    a.bar('baz')
+    a.bar('banana')
     
-    >>> Object a invoked bar with arg='baz'
-    >>> Object b invoked bar with arg='baz'
-    >>> callback was invoked with arg='baz'
+    >>> Object a invoked bar with arg='banana'
+    >>> Object b invoked bar with arg='banana'
+    >>> Object b invoked baz with arg='banana'
+    >>> callback was invoked with arg='banana'
 
 You can ask that the observed object pass itself as the first argument
 whenever it calls observers:
@@ -68,7 +71,8 @@ whenever it calls observers:
     >>> observed_func: I was called
     >>> observer_func: observed_func called me
 
-This works exactly the same for bound methods:
+When observed bound methods pass themselves as the observed object, keep in
+mind that you can always access the associated instance via .__self__:
 
 .. code:: python
 
