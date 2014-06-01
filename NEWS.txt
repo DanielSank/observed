@@ -1,3 +1,22 @@
+1 June 2014
+ v0.5 - This is a big release.
+        Instead of a single decorator `@event` for both normal functions and
+        bound methods, we now have separate decorators for each case:
+          `observable_function` for functions, and
+          `observable_method` for methods.
+        There are two reasons for this. First, the tom-foolery I had to pull to
+        get the single decorator implementation working was fragile and not
+        extensible (for example, we may wish to support making observable class
+        and static methods in the future). Second, by switching to two separate
+        decorators now we keep unification into a single decorator in future
+        releases an available option, and so lose nothing in terms of future
+        possibilities.
+        
+        For developers, another important aspect of this release is that the
+        code should now be a lot easier to understand because every task is
+        handled by exactly one specific class. Also, several missing doc string
+        have been added.
+
 28 May 2014
  v0.4
  Reworked to be PEP8 compliant.
