@@ -131,6 +131,8 @@ class Test(unittest.TestCase):
             del observed, observer, observer_things, observed_things
             self.buf.sort()
             self.assertEqual(expected, self.buf)
+            # This will only work in CPython. In other implementations we
+            # probably have to explicitly run the garbage collector.
             del a, b
             self.assertEqual(len(Foo.bar.instances), 0)
             self.buf = []
