@@ -32,7 +32,6 @@ You can also register observers for bound methods:
         def bar(self, arg):
             print("Object %s invoked bar with arg='%s'"%(self.name, arg))
 
-        @observable_method
         def baz(self, arg):
             print("Object %s invoked baz with arg='%s'"%(self.name, arg))
     
@@ -105,10 +104,10 @@ Notable features include:
   reference count to that observer goes to zero.
 * The @observable_method decorator can be used on methods in classes
   which are unhashable types, and can be used on an arbitrary number of
-  methods in each class.
-* The descriptor which handles observable_method does not paste any data
-  onto the instances it manages. There is zero chance of name collision
-  on the observed instances.
+  methods in each class...
+* ...but the descriptor which handles observable_method does not paste
+  any data onto the instances it manages. There is zero chance of name
+  collision on the observed instances.
 * Tests included :)
 
 
