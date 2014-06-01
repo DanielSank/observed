@@ -1,0 +1,15 @@
+Things to do soon:
+ 1. Audit the weak referencing code and make sure it acts the way we've
+    advertised. In particular, make sure that being simultaneously
+    observed and observer doesn't mess anything up. Obviously this should
+    be handled by writing appropriate tests.
+ 2. Consider whether default weak referencing is even a good idea.
+ 3. Consider whether storing callback information on the instances
+    instead of in the descriptor which manages them. This might be
+    necessary to support pickling.
+
+Things to do ever:
+ 1. Consider whether or not it's possible to write a single decorator
+    which correctly handles functions and methods without pulling the
+    tom-foolery I used to make that work in v0.4.
+ 2. Support observable static and class methods.
