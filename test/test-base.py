@@ -2,7 +2,7 @@ import unittest
 import sys
 import os
 sys.path.insert(0, os.path.abspath('..'))
-from observed.base import observable_function, observable_method
+from observed import observable_function, observable_method
 
 class Foo(object):
     

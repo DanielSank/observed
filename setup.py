@@ -1,6 +1,6 @@
 # Get version information
 import re
-version_file = "observed/_version.py"
+version_file = "observed.py"
 verstrline = open(version_file, "rt").read()
 version_re = r"^__version__ = ['\"]([^'\"]*)['\"]"
 mo = re.search(version_re, verstrline, re.M)
@@ -13,8 +13,8 @@ else:
 from distutils.core import setup
 
 setup(name='observed',
-      packages = ['observed'],
-      version = version,
+      py_modules=['observed'],
+      version=version,
       description='Observer pattern for functions and bound methods',
       author='Daniel Sank',
       license='MIT',

@@ -9,7 +9,7 @@ example will not use the installed code.
 import sys
 import os
 sys.path.insert(0, os.path.abspath('..'))
-from observed.base import observable_function, observable_method
+from observed import observable_function, observable_method
 
 class Foo(object):
     def __init__(self, name):
