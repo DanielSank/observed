@@ -7,6 +7,8 @@ Things to do soon:
  3. Consider whether storing callback information on the instances
     instead of in the descriptor which manages them. This might be
     necessary to support pickling.
+ 4. Make a slightly nicer release doc, with contributors and news all
+    rolled into one document which is exposed on PyPI.
 
 Things to do ever:
  1. Consider whether or not it's possible to write a single decorator

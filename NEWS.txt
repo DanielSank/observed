@@ -14,8 +14,9 @@
         
         For developers, another important aspect of this release is that the
         code should now be a lot easier to understand because every task is
-        handled by exactly one specific class. Also, several missing doc string
-        have been added.
+        handled by exactly one specific class.
+        
+        Many missing doc string have been added.
 
 28 May 2014
  v0.4
