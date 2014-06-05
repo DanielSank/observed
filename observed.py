@@ -1,6 +1,8 @@
 import weakref
 import functools
 
+__version__ = "0.5"
+
 
 class ObserverFunction(object):
     """
