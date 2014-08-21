@@ -285,11 +285,26 @@ class ObservableBoundMethodManager(object):
 
 
 class ObservableUnboundMethod(object):
+    """
+    Wrapper for an unbound version of an observable method.
+    """
     def __init__(self, manager):
+        """
+        Create an ObservableUnboundMethod.
+        
+        manager is the descriptor in charge of this method. See
+        ObservableBoundMethodManager.
+        """
         self._manager = manager
         functools.update_wrapper(self, manager._func)
 
     def __call__(self, obj, *arg, **kw):
+        """Call the unbound method.
+        
+        We essentially build a bound method and call that. This ensures that
+        the code for managing callbacks is invoked in the same was as it would
+        be for a bound method.
+        """
         bound_method = self._manager.__get__(obj, obj.__class__)
         return bound_method(*arg, **kw)
 
