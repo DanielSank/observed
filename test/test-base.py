@@ -69,7 +69,7 @@ class Test(unittest.TestCase):
         # errors are more orthogonal.
         # Another way to handle this would be to create the Foo class in
         # setUp and then just delete it here.
-        Foo.bar.instances = {}
+        Foo.bar._manager.instances = {}
 
     def test_callbacks(self):
         """
@@ -134,7 +134,7 @@ class Test(unittest.TestCase):
             # This will only work in CPython. In other implementations we
             # probably have to explicitly run the garbage collector.
             del a, b
-            self.assertEqual(len(Foo.bar.instances), 0)
+            self.assertEqual(len(Foo.bar._manager.instances), 0)
             self.buf = []
 
     def test_discard(self):
@@ -180,12 +180,12 @@ class Test(unittest.TestCase):
         """
         a = Foo('a', self.buf)
         a.bar()
-        self.assertEqual(len(Foo.bar.instances), 1)
-        self.assertEqual(Foo.bar.instances.keys(), [id(a)])
+        self.assertEqual(len(Foo.bar._manager.instances), 1)
+        self.assertEqual(Foo.bar._manager.instances.keys(), [id(a)])
         self.assertEqual(len(a.bar.callbacks), 0)
         self.assertEqual(self.buf, ['abar'])
         del a
-        self.assertEqual(len(Foo.bar.instances), 0)
+        self.assertEqual(len(Foo.bar._manager.instances), 0)
 
     def test_twoObservableMethodInstances(self):
         """
@@ -198,15 +198,15 @@ class Test(unittest.TestCase):
         b = Foo('b', self.buf)
         a.bar()
         b.bar()
-        self.assertEqual(len(Foo.bar.instances), 2)
-        self.assertEqual(set(Foo.bar.instances.keys()), set([id(a), id(b)]))
+        self.assertEqual(len(Foo.bar._manager.instances), 2)
+        self.assertEqual(set(Foo.bar._manager.instances.keys()), set([id(a), id(b)]))
         self.assertEqual(len(a.bar.callbacks), 0)
         self.assertEqual(len(b.bar.callbacks), 0)
         self.assertEqual(self.buf, ['abar', 'bbar'])
         del a
-        self.assertEqual(len(Foo.bar.instances), 1)
+        self.assertEqual(len(Foo.bar._manager.instances), 1)
         del b
-        self.assertEqual(len(Foo.bar.instances), 0)
+        self.assertEqual(len(Foo.bar._manager.instances), 0)
 
     def test_cleanup(self):
         """
@@ -224,9 +224,9 @@ class Test(unittest.TestCase):
         a.bar()
         self.buf.sort()
         self.assertEqual(self.buf, ['abar','abar', 'bbaz'])
-        self.assertEqual(len(Foo.bar.instances), 1)
+        self.assertEqual(len(Foo.bar._manager.instances), 1)
         del a
-        self.assertEqual(len(Foo.bar.instances), 0)
+        self.assertEqual(len(Foo.bar._manager.instances), 0)
 
     # Everything past here is probably already tested in above tests
     
