@@ -6,27 +6,34 @@ __version__ = "0.5"
 
 class ObserverFunction(object):
     """
-    I am a function which observes another function or method.
+    I wrap a function which is observing another function or method.
+    
+    I use a weak reference to the observing function so that being an observer
+    does not prevent the observing function from being garbage collected.
     """
-    def __init__(self, func, observed_obj, weakref_info):
+    def __init__(self, func, identify_observed, weakref_info):
         """
-        func is the observer who will be called back.
-        observed_obj is the object being observed.
+        func is the observing function which will be called when the observed
+        is called.
+        
+        identify_observed = True means that we will pass the observed thing
+        as the first argument to func whenever we call func.
+        
         weakref_info is the information I need in order to clean myself up if
-        and when my inst is garbage collected.
+        and when func is garbage collected.
         """
         # For some reason, if we put the update_wrapper after we make the
         # weak reference to func, the call to weakref.ref returns a function
         # instead of a weak ref. So, don't move the next line :\
         functools.update_wrapper(self, func)
-        self.observed_obj = observed_obj
+        self.identify_observed = identify_observed
         key, d = weakref_info
         self.func = weakref.ref(func, CleanupHandler(key, d))
     
-    def __call__(self, *arg, **kw):
+    def __call__(self, observed_obj, *arg, **kw):
         """Call me, maybe?"""
-        if self.observed_obj:
-            return self.func()(self.observed_obj, *arg, **kw)
+        if self.identify_observed:
+            return self.func()(observed_obj, *arg, **kw)
         else:
             return self.func()(*arg, **kw)
 
@@ -35,24 +42,27 @@ class ObserverBoundMethod(object):
     """
     I am a bound method which observes another function or method.
     """
-    def __init__(self, inst, method_name, observed_obj, weakref_info):
+    def __init__(self, inst, method_name, identify_observed, weakref_info):
         """
         inst is the object to which I am bound.
+        
         method_name is the name of the function I wrap.
+        
         observed_obj is the object I observe.
+        
         weakref_info is the information I need in order to clean myself up when
         my inst is garbage collected.
         """
-        self.observed_obj = observed_obj
+        self.identify_observed = identify_observed
         key, d = weakref_info
         self.inst = weakref.ref(inst, CleanupHandler(key, d))
         self.method_name = method_name
     
-    def __call__(self, *arg, **kw):
+    def __call__(self, observed_obj, *arg, **kw):
         """call me, baby"""
         bound_method = getattr(self.inst(), self.method_name)
-        if self.observed_obj:
-            return bound_method(self.observed_obj, *arg, **kw)
+        if self.identify_observed:
+            return bound_method(observed_obj, *arg, **kw)
         else:
             return bound_method(*arg, **kw)
 
@@ -110,24 +120,22 @@ class ObservableFunction(object):
 
     def _add_function(self, func, identify_observed):
         """Add a function as an observer."""
-        key = self.make_key_for_function(func)
+        key = self.make_key(func)
         if key not in self.callbacks:
             self.callbacks[key] = ObserverFunction(
-                func, self if identify_observed else None,
-                (key, self.callbacks))
+                func, identify_observed, (key, self.callbacks))
             return True
         else:
             return False
 
-    def _add_bound_method(self, bound_method, identify_observed=False):
+    def _add_bound_method(self, bound_method, identify_observed):
         """Add an bound method as an observer."""
         inst = bound_method.__self__
         method_name = bound_method.__name__
-        key = self.make_key_for_bound_method(bound_method)
+        key = self.make_key(bound_method)
         if key not in self.callbacks:
             self.callbacks[key] = ObserverBoundMethod(
-                inst, method_name, self if identify_observed else None,
-                (key, self.callbacks))
+                inst, method_name, identify_observed, (key, self.callbacks))
             return True
         else:
             return False
@@ -146,16 +154,14 @@ class ObservableFunction(object):
         return discarded
 
     @staticmethod
-    def make_key_for_function(observer):
-        """Make a suitable key for a function."""
-        return id(observer)
-
-    @staticmethod
-    def make_key_for_bound_method(observer):
-        """Make a suitable key for a bound method."""
-        inst = observer.__self__
-        method_name = observer.__name__
-        return (id(inst), method_name)
+    def make_key(observer):
+        if hasattr(observer, "__self__"):
+            inst = observer.__self__
+            method_name = observer.__name__
+            key = (id(inst), method_name)
+        else:
+            key = id(observer)
+        return key
 
     def __call__(self, *arg, **kw):
         """
@@ -171,7 +177,7 @@ class ObservableFunction(object):
         """
         result = self.func(*arg, **kw)
         for key in self.callbacks:
-            self.callbacks[key](*arg, **kw)
+            self.callbacks[key](self, *arg, **kw)
         return result
 
 
@@ -199,7 +205,7 @@ class ObservableBoundMethod(ObservableFunction):
         """
         result = self.func(self.inst, *arg, **kw)
         for key in self.callbacks:
-            self.callbacks[key](*arg, **kw)
+            self.callbacks[key](self, *arg, **kw)
         return result
 
     @property
@@ -247,11 +253,12 @@ class ObservableBoundMethodManager(object):
         If accessed by instance I return an ObservableBoundMethod which handles
         that instance.
         
-        If accessed by class I return the unbound method, which means that
-        calling the method I manage via the class will _not_ fire observers.
+        If accessed by class I return the the descriptor itself (ie. myself).
+        This is useful for testing, but is not compatible with how class based
+        method access is supposed to work in python. We need to fix this.
         """
         if inst is None:
-            return self._func
+            return self
         # Only weak references to instances are stored. This guarantees that
         # the descriptor cannot prevent the instances it manages from being
         # garbage collected.
