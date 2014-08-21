@@ -258,7 +258,7 @@ class ObservableBoundMethodManager(object):
         method access is supposed to work in python. We need to fix this.
         """
         if inst is None:
-            return self
+            return ObservableUnboundMethod(self)
         # Only weak references to instances are stored. This guarantees that
         # the descriptor cannot prevent the instances it manages from being
         # garbage collected.
@@ -282,6 +282,16 @@ class ObservableBoundMethodManager(object):
     def __set__(self, inst, val):
         """Disallow setting because we don't guarantee behavior."""
         raise RuntimeError("Assignment not supported")
+
+
+class ObservableUnboundMethod(object):
+    def __init__(self, manager):
+        self._manager = manager
+        functools.update_wrapper(self, manager._func)
+
+    def __call__(self, obj, *arg, **kw):
+        bound_method = self._manager.__get__(obj, obj.__class__)
+        return bound_method(*arg, **kw)
 
 
 class CleanupHandler(object):
