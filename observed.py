@@ -99,15 +99,18 @@ class ObservableFunction(object):
         
         Returns True if the observer was added, False otherwise.
         """
-        if hasattr(observer, "__self__"):  # observer is a bound method
+        # observer is a bound method
+        if hasattr(observer, "__self__"):
             result = self._add_bound_method(observer, identify_observed)
-        else:  # observer is a normal function
+        # Assume observer is a normal function. Note that we do not handle
+        # class methods or static methods.
+        else:
             result = self._add_function(observer, identify_observed)
         return result
 
     def _add_function(self, func, identify_observed):
         """Add a function as an observer."""
-        key = self.make_key(func)
+        key = self.make_key_for_function(func)
         if key not in self.callbacks:
             self.callbacks[key] = ObserverFunction(
                 func, self if identify_observed else None,
@@ -116,11 +119,11 @@ class ObservableFunction(object):
         else:
             return False
 
-    def _add_bound_method(self, bound_method, identify_observed):
+    def _add_bound_method(self, bound_method, identify_observed=False):
         """Add an bound method as an observer."""
         inst = bound_method.__self__
         method_name = bound_method.__name__
-        key = self.make_key(bound_method)
+        key = self.make_key_for_bound_method(bound_method)
         if key not in self.callbacks:
             self.callbacks[key] = ObserverBoundMethod(
                 inst, method_name, self if identify_observed else None,
@@ -143,14 +146,16 @@ class ObservableFunction(object):
         return discarded
 
     @staticmethod
-    def make_key(observer):
-        """Make a suitable key for a function or bound method."""
-        if hasattr(observer, "__self__"):
-            inst = observer.__self__
-            method_name = observer.__name__
-            return (id(inst), method_name)
-        else:
-            return id(observer)
+    def make_key_for_function(observer):
+        """Make a suitable key for a function."""
+        return id(observer)
+
+    @staticmethod
+    def make_key_for_bound_method(observer):
+        """Make a suitable key for a bound method."""
+        inst = observer.__self__
+        method_name = observer.__name__
+        return (id(inst), method_name)
 
     def __call__(self, *arg, **kw):
         """
@@ -242,23 +247,23 @@ class ObservableBoundMethodManager(object):
         If accessed by instance I return an ObservableBoundMethod which handles
         that instance.
         
-        If accessed by class I return myself; this is not yet compatible with
-        how class access of a method is supposed to work.
+        If accessed by class I return the unbound method, which means that
+        calling the method I manage via the class will _not_ fire observers.
         """
         if inst is None:
-            return self
+            return self._func
         # Only weak references to instances are stored. This guarantees that
         # the descriptor cannot prevent the instances it manages from being
         # garbage collected.
         # We can't use a WeakKeyDict because not all instances are hashable.
         # Instead we use the instance's id as a key which maps to a tuple of a
         # weak ref to the instance, and the callbacks for that instance. The
-        # weak ref has a callback set up to clear the dict entry when the
-        # instance is finalized.
+        # weak ref has an expiration callback set up to clear the dict entry
+        # when the instance is finalized.
         inst_id = id(inst)
         if inst_id in self.instances:
             wr, callbacks = self.instances[inst_id]
-            if not wr():
+            if wr() is None:
                 msg = "Unreachable: instance id=%d not cleaned up"%(inst_id,)
                 raise RuntimeError(msg)
         else:
