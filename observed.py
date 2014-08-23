@@ -191,8 +191,8 @@ class ObservableBoundMethod(ObservableFunction):
         
         inst is the object instance to which I'm bound.
         
-        callbacks is a dict shared by the ObservableBoundMethodManager which
-        created me. See the documentation for ObservableBoundMethodManager.
+        callbacks is a dict shared by the ObservableMethodManager which
+        created me. See the documentation for ObservableMethodManager.
         """
         self.func = func
         functools.update_wrapper(self, func)
@@ -216,9 +216,12 @@ class ObservableBoundMethod(ObservableFunction):
         return self.inst
 
 
-class ObservableBoundMethodManager(object):
+class ObservableMethodManager(object):
     """
-    I manage access to ObservableBoundMethods.
+    I manage access to observable methods.
+    
+    When accessed through an instance I return an ObservableBoundMethod.
+    When accessed through a class I return an ObservableUnboundMethod.
     
     I store no strong references to the instances I manage. This guarantees
     that I don't prevent garbage collection of the instances I manage.
@@ -293,7 +296,7 @@ class ObservableUnboundMethod(object):
         Create an ObservableUnboundMethod.
         
         manager is the descriptor in charge of this method. See
-        ObservableBoundMethodManager.
+        ObservableMethodManager.
         """
         self._manager = manager
         functools.update_wrapper(self, manager._func)
@@ -390,4 +393,4 @@ def observable_method(func):
     
     To decorate functions use observable_function.
     """
-    return ObservableBoundMethodManager(func)
+    return ObservableMethodManager(func)
