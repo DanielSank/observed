@@ -153,6 +153,16 @@ class Test(unittest.TestCase):
         a.bar()
         self.assertEqual(self.buf, ['abar'])
 
+    def test_unbound_method(self):
+        f = Foo('f', self.buf)
+
+        def func():
+            self.buf.append('func')
+
+        f.bar.add_observer(func)
+        Foo.bar(f)
+        self.assertEqual(self.buf, ['fbar', 'func'])
+
     def test_callerIdentification(self):
         """
         The observed object can pass itself as first argument.
