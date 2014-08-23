@@ -208,6 +208,11 @@ class ObservableBoundMethod(ObservableFunction):
             self.callbacks[key](self, *arg, **kw)
         return result
 
+    def __eq__(self, other):
+        return all((
+            self.inst == other.inst,
+            self.func == other.func))
+
     @property
     def __self__(self):
         """
@@ -248,6 +253,7 @@ class ObservableMethodManager(object):
         create.
         """
         self._func = func
+        self._unbound_method = ObservableUnboundMethod(self)
         # instance id -> (inst weak ref, callbacks)
         self.instances = {}
 
@@ -261,7 +267,7 @@ class ObservableMethodManager(object):
         method access is supposed to work in python. We need to fix this.
         """
         if inst is None:
-            return ObservableUnboundMethod(self)
+            return self._unbound_method
         # Only weak references to instances are stored. This guarantees that
         # the descriptor cannot prevent the instances it manages from being
         # garbage collected.

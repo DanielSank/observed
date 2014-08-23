@@ -163,6 +163,19 @@ class Test(unittest.TestCase):
         Foo.bar(f)
         self.assertEqual(self.buf, ['fbar', 'func'])
 
+    def test_equality(self):
+        f = Foo('f', self.buf)
+        g = Foo('g', self.buf)
+
+        @observable_function
+        def func():
+            self.buf.append('func')
+
+        self.assertEqual(Foo.bar, Foo.bar)
+        self.assertEqual(f.bar, f.bar)
+        self.assertNotEqual(f.bar, g.bar)
+        self.assertEqual(func, func)
+
     def test_callerIdentification(self):
         """
         The observed object can pass itself as first argument.
