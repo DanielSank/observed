@@ -136,7 +136,7 @@ class ObservableFunction(object):
         registers observer to be called whenever I am called
     
     discard_observer(observer)
-        discards observer from the set of callbacks
+        Removes an observer from the set of observers.
     """
 
     def __init__(self, func):
@@ -147,7 +147,7 @@ class ObservableFunction(object):
         """
         functools.update_wrapper(self, func)
         self.func = func
-        self.callbacks = {} #observing object ID -> weak ref, info
+        self.observers = {} #observing object ID -> weak ref, info
 
     def add_observer(self, observer, identify_observed=False):
         """
@@ -181,9 +181,9 @@ class ObservableFunction(object):
     def _add_function(self, func, identify_observed):
         """Add a function as an observer."""
         key = self.make_key(func)
-        if key not in self.callbacks:
-            self.callbacks[key] = ObserverFunction(
-                func, identify_observed, (key, self.callbacks))
+        if key not in self.observers:
+            self.observers[key] = ObserverFunction(
+                func, identify_observed, (key, self.observers))
             return True
         else:
             return False
@@ -193,9 +193,9 @@ class ObservableFunction(object):
         inst = bound_method.__self__
         method_name = bound_method.__name__
         key = self.make_key(bound_method)
-        if key not in self.callbacks:
-            self.callbacks[key] = ObserverBoundMethod(
-                inst, method_name, identify_observed, (key, self.callbacks))
+        if key not in self.observers:
+            self.observers[key] = ObserverBoundMethod(
+                inst, method_name, identify_observed, (key, self.observers))
             return True
         else:
             return False
@@ -208,8 +208,8 @@ class ObservableFunction(object):
         """
         discarded = False
         key = self.make_key(observer)
-        if key in self.callbacks:
-            del self.callbacks[key]
+        if key in self.observers:
+            del self.observers[key]
             discarded = True
         return discarded
 
@@ -237,38 +237,38 @@ class ObservableFunction(object):
         
         Note:
         I think it is possible for observers to disappear while we execute
-        callbacks. It might be better to make strong references to all
+        them. It might be better to make strong references to all
         observers before we start callback execution, since we don't keep
         strong references elsewhere.
         """
         result = self.func(*arg, **kw)
-        for key in self.callbacks:
-            self.callbacks[key](self, *arg, **kw)
+        for key in self.observers:
+            self.observers[key](self, *arg, **kw)
         return result
 
 
 class ObservableBoundMethod(ObservableFunction):
     """I am a bound method version of ObservableFunction."""
-    def __init__(self, func, inst, callbacks):
+    def __init__(self, func, inst, observers):
         """
         func is the function I wrap.
         
         inst is the object instance to which I'm bound.
         
-        callbacks keeps track of my observers. It is shared by the
+        observers keeps track of my observers. It is shared by the
         ObservableMethodManager which created me. See the documentation for
         ObservableMethodManager.
         """
         self.func = func
         functools.update_wrapper(self, func)
         self.inst = inst
-        self.callbacks = callbacks
+        self.observers = observers
 
     def __call__(self, *arg, **kw):
         """Call the function I wrap and all of my observers."""
         result = self.func(self.inst, *arg, **kw)
-        for key in self.callbacks:
-            self.callbacks[key](self, *arg, **kw)
+        for key in self.observers:
+            self.observers[key](self, *arg, **kw)
         return result
 
     def __eq__(self, other):
@@ -300,7 +300,7 @@ class ObservableMethodManager(object):
     instance and return it. Observers added to that ObservableBoundMethod, are
     persisted by me, not as attributes of the instances.
     """
-    # We persist the callbacks here because if we try to persist them inside
+    # We persist the observers here because if we try to persist them inside
     # the ObservableBoundMethods then we have to persist the
     # ObservableBoundMethods. That would be bad, because then the reference to
     # the inst inside the ObservableBoundMethod would be persisted and would
@@ -309,7 +309,7 @@ class ObservableMethodManager(object):
     # collection of the inst as long as the ObservableBoundMethod is alive. If
     # this doesn't make sense draw a picture of what references what and it
     # will become clear.
-    # The other option is to persist the callbacks as attributes of the
+    # The other option is to persist the observers as attributes of the
     # instances themselves. This may be a better option than what we're doing
     # here, because it simplifies the code and makes pickling easier.
     def __init__(self, func):
@@ -321,7 +321,7 @@ class ObservableMethodManager(object):
         """
         self._func = func
         self._unbound_method = ObservableUnboundMethod(self)
-        # instance id -> (inst weak ref, callbacks)
+        # instance id -> (inst weak ref, observers)
         self.instances = {}
 
     def __get__(self, inst, cls):
@@ -340,20 +340,20 @@ class ObservableMethodManager(object):
         # garbage collected.
         # We can't use a WeakKeyDict because not all instances are hashable.
         # Instead we use the instance's id as a key which maps to a tuple of a
-        # weak ref to the instance, and the callbacks for that instance. The
+        # weak ref to the instance, and the observers for that instance. The
         # weak ref has an expiration callback set up to clear the dict entry
         # when the instance is finalized.
         inst_id = id(inst)
         if inst_id in self.instances:
-            wr, callbacks = self.instances[inst_id]
+            wr, observers = self.instances[inst_id]
             if wr() is None:
                 msg = "Unreachable: instance id=%d not cleaned up"%(inst_id,)
                 raise RuntimeError(msg)
         else:
             wr = weakref.ref(inst, CleanupHandler(inst_id, self.instances))
-            callbacks = {}
-            self.instances[inst_id] = (wr, callbacks)
-        return ObservableBoundMethod(self._func, inst, callbacks)
+            observers = {}
+            self.instances[inst_id] = (wr, observers)
+        return ObservableBoundMethod(self._func, inst, observers)
 
     def __set__(self, inst, val):
         """Disallow setting because we don't guarantee behavior."""
@@ -379,7 +379,7 @@ class ObservableUnboundMethod(object):
         Call the unbound method.
         
         We essentially build a bound method and call that. This ensures that
-        the code for managing callbacks is invoked in the same was as it would
+        the code for managing observers is invoked in the same was as it would
         be for a bound method.
         """
         bound_method = self._manager.__get__(obj, obj.__class__)

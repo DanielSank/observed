@@ -139,7 +139,7 @@ class Test(unittest.TestCase):
 
     def test_discard(self):
         """
-        Disarding observers disables callbacks.
+        discard_observer prevents future ivocation.
         """
         a = Foo('a', self.buf)
         def f():
@@ -205,7 +205,7 @@ class Test(unittest.TestCase):
         a.bar()
         self.assertEqual(len(Foo.bar._manager.instances), 1)
         self.assertEqual(Foo.bar._manager.instances.keys(), [id(a)])
-        self.assertEqual(len(a.bar.callbacks), 0)
+        self.assertEqual(len(a.bar.observers), 0)
         self.assertEqual(self.buf, ['abar'])
         del a
         self.assertEqual(len(Foo.bar._manager.instances), 0)
@@ -223,8 +223,8 @@ class Test(unittest.TestCase):
         b.bar()
         self.assertEqual(len(Foo.bar._manager.instances), 2)
         self.assertEqual(set(Foo.bar._manager.instances.keys()), set([id(a), id(b)]))
-        self.assertEqual(len(a.bar.callbacks), 0)
-        self.assertEqual(len(b.bar.callbacks), 0)
+        self.assertEqual(len(a.bar.observers), 0)
+        self.assertEqual(len(b.bar.observers), 0)
         self.assertEqual(self.buf, ['abar', 'bbar'])
         del a
         self.assertEqual(len(Foo.bar._manager.instances), 1)
@@ -240,10 +240,10 @@ class Test(unittest.TestCase):
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
         a.bar.add_observer(b.baz)
-        self.assertEqual(len(a.bar.callbacks), 1)
+        self.assertEqual(len(a.bar.observers), 1)
         a.bar()
         del b
-        self.assertEqual(len(a.bar.callbacks), 0)
+        self.assertEqual(len(a.bar.observers), 0)
         a.bar()
         self.buf.sort()
         self.assertEqual(self.buf, ['abar','abar', 'bbaz'])
@@ -263,8 +263,8 @@ class Test(unittest.TestCase):
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
         a.bar.add_observer(b.baz)
-        self.assertEqual(len(a.bar.callbacks), 1)
-        self.assertTrue((id(b), 'baz') in a.bar.callbacks)
+        self.assertEqual(len(a.bar.observers), 1)
+        self.assertTrue((id(b), 'baz') in a.bar.observers)
         a.bar()
         self.assertEqual(self.buf, ['abar','bbaz'])
 
@@ -275,7 +275,7 @@ class Test(unittest.TestCase):
         a = Foo('a', self.buf)
         b = Foo('b', self.buf)
         a.bar.add_observer(b.bar)
-        cb = a.bar.callbacks
+        cb = a.bar.observers
         self.assertEqual(len(cb), 1)
         self.assertTrue((id(b), 'bar') in cb)
         a.bar()
@@ -290,7 +290,7 @@ class Test(unittest.TestCase):
         b = Foo('b', self.buf)
         a.bar.add_observer(b.bar)
         a.bar.add_observer(b.baz)
-        cb = a.bar.callbacks
+        cb = a.bar.observers
         self.assertEqual(len(cb), 2)
         ids = set(cb.keys())
         self.assertTrue((id(b), 'bar') in ids)
@@ -322,8 +322,8 @@ class Test(unittest.TestCase):
         a.bar.add_observer(b.baz)
         a.bar.add_observer(b.bar)
         a.bar.add_observer(func)
-        self.assertEqual(len(a.bar.callbacks), 3)
-        self.assertEqual(set(a.bar.callbacks.keys()),
+        self.assertEqual(len(a.bar.observers), 3)
+        self.assertEqual(set(a.bar.observers.keys()),
             set([(id(b), 'bar'), (id(b), 'baz'), id(func)]))
         a.bar()
         self.buf.sort()
