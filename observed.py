@@ -162,9 +162,6 @@ class ObservableFunction(object):
         as an additional first argument whenever it is invoked. See
         ObserverFunction and ObserverBoundMethod to see how this works.
         
-        If I am a bound method, observers can access the object to which I'm bound
-        via .__self__.
-        
         If a bound method or function has already been registered as an
         observer, trying to add it again does nothing. In other words, there is
         no way to sign up an observer to be called back multiple times. This
