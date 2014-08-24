@@ -27,7 +27,7 @@ def observing_func2(obj, x):
     print("observing_func2 called with arg %s"%(x,))
     print("I was called by %s"%(obj,))
 
-observed_func.add_observer(observing_func2)
+observed_func.add_observer(observing_func2, identify_observed=True)
 observed_func('banana')
 
 >>> observed_func called with arg banana
