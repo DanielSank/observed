@@ -329,9 +329,7 @@ class ObservableMethodManager(object):
         If accessed by instance I return an ObservableBoundMethod which handles
         that instance.
         
-        If accessed by class I return the the descriptor itself (ie. myself).
-        This is useful for testing, but is not compatible with how class based
-        method access is supposed to work in python. We need to fix this.
+        If accessed by class I return an ObservableUnboundMethod.
         """
         if inst is None:
             return self._unbound_method
