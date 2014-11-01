@@ -1,0 +1,12 @@
+* text=auto
+
+*.txt text
+*.c text
+*.cpp text
+*.h text
+*.py text
+
+*.jpg binary
+*.svg binary
+*.png binary
+*.pdf binary
