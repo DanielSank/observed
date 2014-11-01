@@ -6,6 +6,10 @@
 *.h eol=lf
 *.py eol=lf
 
+*.in eol=lf
+*.rst eol=lf
+*.crf eol=lf
+
 *.jpg binary
 *.svg binary
 *.png binary
