@@ -528,4 +528,4 @@ def observable_method(func):
     a.bar.discard_observer(callback)
 
     """
-    return ObservableMethodManager_PersistOnDescriptor(func)
+    return ObservableMethodManager_PersistOnInstances(func)
