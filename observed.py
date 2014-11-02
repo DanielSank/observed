@@ -1,8 +1,11 @@
 """
 This module implements the observer design pattern.
+
 It provides two decorators:
+
     observable_function
     observable_method
+
 which you use to make functions and methods observable by other functions and
 methods. For example:
 
@@ -19,9 +22,9 @@ observed_func('banana')
 >>> observed_func called with arg banana
 >>> observing_func called with arg banana
 
-When registering observers, if the optional argument identify_observed=True,
-then when the observers are called, the observed object will be passed as the
-first argument:
+When registering observers, if the optional argument identify_observed is set
+to True, then when the observers are called, the observed object will be
+passed as the first argument:
 
 def observing_func2(obj, x):
     print("observing_func2 called with arg %s"%(x,))
@@ -35,12 +38,34 @@ observed_func('banana')
 >>> observing_func2 called with arg banana
 >>> I was called by <observed.ObservableFunction object at 0x12345678>
 
+Methods can be observed as well:
+
+class Foo(object):
+
+    @observable_method
+    def bar(self, x):
+        print("bar called with argument %s"%(x,))
+
+f = Foo()
+f.bar.add_observer(observing_func)
+f.bar('banana')
+
+>>> bar called with argument banana
+>>> observing_func called with argument banana
+
+Any function or bound method can be made an observer, and any function or
+method decorated with observable_function or observable_method can be observed.
+Decorated functions and methods can be observers too.
+
 Unregister observers like this:
 
 observed_func.discard_observer(observing_func)
+observed_func.discard_observer(observing_func2)
+observed_func('banana')
 
-See the docstrings for observable_function and observable_method for full
-details.
+>>> observed_func called with arg banana
+
+See also the docstrings for observable_function and observable_method.
 """
 
 import weakref
