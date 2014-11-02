@@ -49,6 +49,9 @@ import functools
 __version__ = "0.5"
 
 
+INSTANCE_OBSERVER_ATTR = "_observed__observers"
+
+
 class ObserverFunction(object):
     """
     I wrap a function which is observing another function or method.
@@ -286,7 +289,50 @@ class ObservableBoundMethod(ObservableFunction):
         return self.inst
 
 
-class ObservableMethodManager(object):
+class ObservableMethodManager_PersistOnInstances(object):
+    """
+    I manage access to observable methods.
+    
+    When accessed through an instance I return an ObservableBoundMethod.
+    When accessed through a class I return an ObservableUnboundMethod.
+    
+    When an instance accesses me, I create an ObservableBoundMethod for that
+    instance and return it.
+    """
+    def __init__(self, func):
+        """
+        Initialize me.
+        
+        func is the function I will give to the ObservableBoundMethods I
+        create.
+        """
+        self._func = func
+        self._unbound_method = ObservableUnboundMethod(self)
+
+    def __get__(self, inst, cls):
+        """
+        If accessed by instance I return an ObservableBoundMethod which handles
+        that instance.
+        
+        If accessed by class I return an ObservableUnboundMethod.
+        """
+        if inst is None:
+            return self._unbound_method
+        else:
+            if not hasattr(inst, INSTANCE_OBSERVER_ATTR):
+                d = {}
+                setattr(inst, INSTANCE_OBSERVER_ATTR, d)
+            else:
+                d = getattr(inst, INSTANCE_OBSERVER_ATTR)
+            observers = d.setdefault(self._func.__name__, {})
+        return ObservableBoundMethod(self._func, inst, observers)
+
+    def __set__(self, inst, val):
+        """Disallow setting because we don't guarantee behavior."""
+        raise RuntimeError("Assignment not supported")
+
+
+class ObservableMethodManager_PersistOnDescriptor(object):
     """
     I manage access to observable methods.
     
@@ -482,4 +528,4 @@ def observable_method(func):
     a.bar.discard_observer(callback)
 
     """
-    return ObservableMethodManager(func)
+    return ObservableMethodManager_PersistOnDescriptor(func)
