@@ -2,6 +2,7 @@ import unittest
 import sys
 import os
 sys.path.insert(0, os.path.abspath('..'))
+import observed
 from observed import observable_function, observable_method
 
 
@@ -83,6 +84,69 @@ class Foo(object):
         caller_name = get_caller_name(caller)
         self.buf.append("%swaldo%s"%(self.name, caller_name))
 
+    def observable_methods(self):
+        return [self.bar, self.milton]
+
+    def method_info(self):
+        return [(self.bar, False),
+                (self.baz, False),
+                (self.milton, True),
+                (self.waldo, True)]
+
+
+class Goo(Foo):
+    """A class using the descriptor strategy for observable methods.
+
+    I am entirely similar to Foo except that my observable methods use the
+    descriptor persistence strategy. See the docstring for observable_method
+    for a detailed explanation.
+    """
+
+    def bar(self):
+        self.buf.append("%sbar"%(self.name,))
+    bar = observable_method(bar, strategy='descriptor')
+
+    def milton(self, caller):
+        caller_name = get_caller_name(caller)
+        self.buf.append("%smilton%s"%(self.name, caller_name))
+    milton = observable_method(milton, strategy='descriptor')
+
+
+# Not currently used
+
+def get_observables(*objs):
+    """Get a list observables from some objects.
+
+    For each object, if it's a Foo or subclass, we get all of the object's
+    observable methods. If it's a function
+    """
+
+    observables = []
+    for obj in objs:
+        if isinstance(obj, Foo):
+            observables.extend(obj.observable_methods())
+        elif isinstance(obj, observed.ObservableFunction):
+            observables.append(obj)
+        else:
+            raise TypeError("Object of type %s not observable"%(type(obj),))
+    return observables
+
+
+def get_observers(*objs):
+    observer_sets = []
+    single_observers = []
+    for obj in objs:
+        if isinstance(obj, Foo):
+            single_observers.extend(obj.method_info())
+        else:
+            single_observers.append((obj[0], obj[1]))
+    for num_observers in range(len(single_observers)):
+        for comb in itertools.combinations(single_observers, num_observers):
+            observer_sets.append(comb)
+    return observer_sets
+
+# End not currently used
+
 
 def make_observed_dict(*objects):
     """Construct a table of observable objects keyed by unique string names.
@@ -108,10 +172,12 @@ def make_observed_dict(*objects):
     result = []
     for obj in objects:
         if isinstance(obj, Foo):
-            result.append((obj.name+'.bar', getattr(obj, "bar")))
-            result.append((obj.name+'.milton', getattr(obj, "milton")))
-        else:
+            result.append((obj.name+'.bar', obj.bar))
+            result.append((obj.name+'.milton', obj.milton))
+        elif isinstance(obj, observed.ObservableFunction):
             result.append((obj.__name__, obj))
+        else:
+            raise TypeError("Object of type %s not observable"%(type(obj),))
     return dict(result)
 
 
@@ -132,7 +198,7 @@ def make_observer_dict(*objects):
     return dict(result)
 
 
-class TestObserverExecution(unittest.TestCase):
+class TestBasics(unittest.TestCase):
     """Test that observers are called when the observed object is called."""
 
     ITEMS = [('a.bar',
@@ -158,7 +224,11 @@ class TestObserverExecution(unittest.TestCase):
              ('f',
               [('b.milton', True), ('b.baz', False)],
               ['bbaz', 'bmiltonf', 'f'],
-              ['f'])
+              ['f']),
+             ('c.bar',
+              [('a.bar', False), ('d.baz', False), ('d.waldo', True)],
+              ['abar', 'cbar', 'dbaz', 'dwaldoc'],
+              ['cbar'])
             ]
 
     def setUp(self):
@@ -180,6 +250,8 @@ class TestObserverExecution(unittest.TestCase):
         for observed_str, observer_info, expected, final in self.ITEMS:
             a = Foo('a', self.buf)
             b = Foo('b', self.buf)
+            c = Goo('c', self.buf)
+            d = Goo('d', self.buf)
             
             @observable_function
             def f():
@@ -189,8 +261,8 @@ class TestObserverExecution(unittest.TestCase):
             def g(caller):
                 self.buf.append('g%s'%(caller,))
             
-            observed_objects = make_observed_dict(a, b, f)
-            observer_objects = make_observer_dict(a, b, f, g)
+            observed_objects = make_observed_dict(a, b, c, d, f)
+            observer_objects = make_observer_dict(a, b, c, d, f, g)
 
             observed = observed_objects[observed_str]
             for observer_str, identify_observed in observer_info:
