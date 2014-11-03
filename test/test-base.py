@@ -1,6 +1,7 @@
 import unittest
 import sys
 import os
+import itertools
 sys.path.insert(0, os.path.abspath('..'))
 import observed
 from observed import observable_function, observable_method
@@ -132,7 +133,7 @@ def get_observables(*objs):
     return observables
 
 
-def get_observers(*objs):
+def get_observer_sets(*objs):
     observer_sets = []
     single_observers = []
     for obj in objs:
@@ -140,10 +141,45 @@ def get_observers(*objs):
             single_observers.extend(obj.method_info())
         else:
             single_observers.append((obj[0], obj[1]))
-    for num_observers in range(len(single_observers)):
-        for comb in itertools.combinations(single_observers, num_observers):
-            observer_sets.append(comb)
+    # for num_observers in range(len(single_observers)):
+    for comb in itertools.combinations(single_observers, 3):
+        observer_sets.append(comb)
     return observer_sets
+
+
+def get_items(observables, observer_sets):
+
+    def get_buff_data(observable, observer, identify_observed):
+        """Get the buffer data an object will write."""
+        if hasattr(observer, '__self__'):
+            expected = observer.__self__.name+observer.__name__
+        else:
+            expected = observer.__name__
+        if identify_observed:
+            expected = expected + get_caller_name(observable)
+        return expected
+
+    items = []
+    for observable, observer_set in itertools.product(observables, observer_sets):
+        # Don't include this combination if it would cause infinite recursion.
+        recursion = False
+        for observer, _ in observer_set:
+            if type(observer) == type(observable):
+                if observer == observable:
+                    recursion = True
+        if recursion:
+            continue
+        buff_data = []
+        if isinstance(observable, observed.ObservableBoundMethod):
+            final = observable.__self__.name + observable.__name__
+        elif isinstance(observable, observed.ObservableFunction):
+            final = observale.__name__
+        for observer, caller_id in observer_set:
+            buff_data.append(get_buff_data(observable, observer, caller_id))
+        buff_data.insert(0, final)
+        buff_data.sort()
+        items.append((observable, observer_set, buff_data, final))
+    return items
 
 # End not currently used
 
