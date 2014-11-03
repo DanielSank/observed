@@ -86,7 +86,12 @@ class Foo(object):
         self.buf.append("%swaldo%s"%(self.name, caller_name))
 
     def observable_methods(self):
-        return [self.bar, self.milton]
+        """Get all of this object's observable methods.
+
+        We don't include milton because our testing procedure isn't smart
+        enough to know to call it with an argument.
+        """
+        return [self.bar]
 
     def method_info(self):
         return [(self.bar, False),
@@ -112,8 +117,6 @@ class Goo(Foo):
         self.buf.append("%smilton%s"%(self.name, caller_name))
     milton = observable_method(milton, strategy='descriptor')
 
-
-# Not currently used
 
 def get_observables(*objs):
     """Get a list observables from some objects.
@@ -164,108 +167,25 @@ def get_items(observables, observer_sets):
         # Don't include this combination if it would cause infinite recursion.
         recursion = False
         for observer, _ in observer_set:
-            if type(observer) == type(observable):
-                if observer == observable:
-                    recursion = True
+            if type(observer) == type(observable) and observer == observable:
+                recursion = True
         if recursion:
             continue
-        buff_data = []
+        expected_buf = []
         if isinstance(observable, observed.ObservableBoundMethod):
             final = observable.__self__.name + observable.__name__
         elif isinstance(observable, observed.ObservableFunction):
-            final = observale.__name__
+            final = observable.__name__
         for observer, caller_id in observer_set:
-            buff_data.append(get_buff_data(observable, observer, caller_id))
-        buff_data.insert(0, final)
-        buff_data.sort()
-        items.append((observable, observer_set, buff_data, final))
+            expected_buf.append(get_buff_data(observable, observer, caller_id))
+        expected_buf.insert(0, final)
+        expected_buf.sort()
+        items.append((observable, observer_set, expected_buf, [final]))
     return items
-
-# End not currently used
-
-
-def make_observed_dict(*objects):
-    """Construct a table of observable objects keyed by unique string names.
-
-    In test scripts, it is convenient to able to iterate over combinations of
-    observed and observing objects. However, we may wish to define these
-    combinations before the objects are constructed. Therefore, we define the
-    combinations as a set of string identifiers and then _after_ the objects
-    are created we use this function to build a table of objects keyed by
-    those identifiers.
-
-    Args:
-        objects: Collection of objects to be formed into the table.
-
-    Returns:
-        A table of observable objects keyed by unique string identifiers. A Foo
-        instance with .name="my_foo" produces two entries in the table:
-            "my_foo.bar": my_foo.bar
-            "my_foo.milton": my_foo.milton
-        and a function func produces one entry:
-            "func": func.
-    """
-    result = []
-    for obj in objects:
-        if isinstance(obj, Foo):
-            result.append((obj.name+'.bar', obj.bar))
-            result.append((obj.name+'.milton', obj.milton))
-        elif isinstance(obj, observed.ObservableFunction):
-            result.append((obj.__name__, obj))
-        else:
-            raise TypeError("Object of type %s not observable"%(type(obj),))
-    return dict(result)
-
-
-def make_observer_dict(*objects):
-    """Construct a table of observer objects keyed by unique string names.
-
-    Take a look at the docstring for make_observed_dict. This function is
-    essentially the same thing but for observers instead of observables.
-    """
-    result = []
-    for obj in objects:
-        if isinstance(obj, Foo):
-            for method_name in ['bar', 'baz', 'milton', 'waldo']:
-                s = obj.name+'.'+method_name
-                result.append((s, getattr(obj, method_name)))
-        else:
-            result.append((obj.__name__, obj))
-    return dict(result)
 
 
 class TestBasics(unittest.TestCase):
     """Test that observers are called when the observed object is called."""
-
-    ITEMS = [('a.bar',
-              [('b.baz', False)],
-              ['abar', 'bbaz'],
-              ['abar']),
-             ('a.bar',
-              [('b.bar', False), ('b.baz', False)],
-              ['abar', 'bbar', 'bbaz'],
-              ['abar']),
-             ('a.bar',
-              [('b.bar', False), ('b.baz', False), ('f', False)],
-              ['abar', 'bbar', 'bbaz', 'f'],
-              ['abar']),
-             ('f',
-              [('b.bar', False), ('b.baz', False), ('a.bar', False)],
-              ['abar', 'bbar', 'bbaz', 'f'],
-              ['f']),
-             ('a.bar',
-              [('b.milton', True), ('b.waldo', True)],
-              ['abar', 'bmiltona', 'bwaldoa'],
-              ['abar']),
-             ('f',
-              [('b.milton', True), ('b.baz', False)],
-              ['bbaz', 'bmiltonf', 'f'],
-              ['f']),
-             ('c.bar',
-              [('a.bar', False), ('d.baz', False), ('d.waldo', True)],
-              ['abar', 'cbar', 'dbaz', 'dwaldoc'],
-              ['cbar'])
-            ]
 
     def setUp(self):
         self.buf = []
@@ -283,40 +203,38 @@ class TestBasics(unittest.TestCase):
         any observers.
         """
 
-        for observed_str, observer_info, expected, final in self.ITEMS:
-            a = Foo('a', self.buf)
-            b = Foo('b', self.buf)
-            c = Goo('c', self.buf)
-            d = Goo('d', self.buf)
-            
-            @observable_function
-            def f():
-                self.buf.append('f')
-            
-            @observable_function
-            def g(caller):
-                self.buf.append('g%s'%(caller,))
-            
-            observed_objects = make_observed_dict(a, b, c, d, f)
-            observer_objects = make_observer_dict(a, b, c, d, f, g)
+        a = Foo('a', self.buf)
+        b = Foo('b', self.buf)
+        c = Goo('c', self.buf)
+        d = Goo('d', self.buf)
 
-            observed = observed_objects[observed_str]
-            for observer_str, identify_observed in observer_info:
-                observer = observer_objects[observer_str]
+        @observable_function
+        def f():
+            self.buf.append('f')
+        
+        @observable_function
+        def g(caller):
+            self.buf.append('g%s'%(get_caller_name(caller),))
+
+        # We don't include g in our set of observables because the testing
+        # code isn't smart enough to call it with an argument.
+        observables = get_observables(a, b, c, d, f)
+        observer_sets = get_observer_sets(a, b, c, d, (f, False), (g, True))
+        items = get_items(observables, observer_sets)
+
+        for observed, observer_set, expected_buf, final_buf in items:
+            for observer, identify_observed in observer_set:
                 observed.add_observer(observer,
                     identify_observed=identify_observed)
             observed()
             self.buf.sort()
-            self.assertEqual(expected, self.buf)
-
+            self.assertEqual(self.buf, expected_buf)
             clear_list(self.buf)
-            for observer_str, _ in observer_info:
-                observer = observer_objects[observer_str]
+            for observer, _ in observer_set:
                 observed.discard_observer(observer)
             observed()
-            self.assertEqual(final, self.buf)
-
-            self.buf = []
+            self.assertEqual(self.buf, final_buf)
+            clear_list(self.buf)
 
     def test_discard(self):
         """
