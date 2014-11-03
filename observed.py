@@ -519,11 +519,11 @@ def observable_function(func):
     return ObservableFunction(func)
 
 
-def observable_method(func):
+def observable_method(func, strategy='instances'):
     """
     I turn a method into something that can be observed by other callables.
     
-    Use me as a decorator on a method, like this:
+    You can use me as a decorator on a method, like this:
     
     class Foo(object):
         __init__(self, name):
@@ -536,21 +536,62 @@ def observable_method(func):
     Now other functions and methods can sign up to get notified when my_func is
     called:
     
-    def callback(x):
-        print("callback called with arg: %s"%(x,))
+    def observer(x):
+        print("observer called with arg: %s"%(x,))
     
     a = Foo('a')
     b = Foo('b')
-    a.bar.add_observer(callback)
+    a.bar.add_observer(observer)
     a.bar.add_observer(b.bar)
     a.bar('banana')
     >>> a called bar with arg: banana
     >>> b called bar with arg: banana
-    >>> callback called with arg: banana
+    >>> observer called with arg: banana
+    
+    Note that bar can be an observer as well as observed.
     
     Unregister observers like this:
     
-    a.bar.discard_observer(callback)
+    a.bar.discard_observer(observer)
+    
+    Args:
+        func: The function (i.e. unbound method) to be made observable.
+        strategy: This argument requires some background explanation. When
+            observers are registered to a bound method, we need to store those
+            observers so that we can call them when the observed method is
+            called. There are two ways to do this as explained below. In any
+            case, access to the observable method is managed by a descriptor,
+            and we select which strategy we use for storing observers by using
+            one descriptor or another. The strategy argument selects the
+            descriptor used.
 
+            The first strategy is to give each instance of the class containing
+            the decorated method an attribute whose value is a collection of
+            observers for each of its observable methods. This is the default
+            strategy and is implemented in
+            ObservableMethodManager_PersistOnInstances.
+            The advantages of this strategy are that the code is very simple
+            and pickling the observers along with the instance owning the
+            observable methods is easier.
+
+            The other strategy is to persist the observers for each instance
+            inside the descriptor which manages access to that method. This
+            strategy is implemented in
+            ObservableMethodManager_PersistOnDescriptor.
+            The advantage(?) of this strategy is that the observer framework
+            doesn't paste any data onto the instances which have observable
+            methods. It's not entirely clear that this is actually useful but
+            we include it as an option.
+
+            For the simpler strategy in which we store the observers in the
+            instances, just use me as a decorator. If you want the alternate
+            strategy in which the observers are stored in the descriptor,
+            call me explicitly on the function (unbound method) you want to
+            make observable and set strategy='descriptor'.
     """
-    return ObservableMethodManager_PersistOnInstances(func)
+    if strategy == 'instances':
+        return ObservableMethodManager_PersistOnInstances(func)
+    elif strategy == 'descriptor':
+        return ObservableMethodManager_PersistOnDescriptor(func)
+    else:
+        raise ValueError("Strategy %s not recognized"%(strategy,))
