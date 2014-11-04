@@ -28,7 +28,7 @@ passed as the first argument:
 
 def observing_func2(obj, x):
     print("observing_func2 called with arg %s"%(x,))
-    print("I was called by %s"%(obj,))
+    print("I was called by %s"%(obj.__name__,))
 
 observed_func.add_observer(observing_func2, identify_observed=True)
 observed_func('banana')
@@ -36,7 +36,7 @@ observed_func('banana')
 >>> observed_func called with arg banana
 >>> observing_func called with arg banana
 >>> observing_func2 called with arg banana
->>> I was called by <observed.ObservableFunction object at 0x12345678>
+>>> I was called by observed_func
 
 Methods can be observed as well:
 
@@ -53,9 +53,9 @@ f.bar('banana')
 >>> bar called with argument banana
 >>> observing_func called with argument banana
 
-Any function or bound method can be made an observer, and any function or
-method decorated with observable_function or observable_method can be observed.
-Decorated functions and methods can be observers too.
+Any function or bound method can be made registered as an observer, and any
+function or method decorated with observable_function or observable_method
+can be observed. Decorated functions and methods can be observers too.
 
 Unregister observers like this:
 
@@ -65,7 +65,10 @@ observed_func('banana')
 
 >>> observed_func called with arg banana
 
-See also the docstrings for observable_function and observable_method.
+For more information, see the docstrings for observable_function and
+observable_method. If you're a developer trying to understand how the code
+works, I recommend starting with ObservableFunction, and then ObserverFunction
+and ObserverBoundMethod.
 """
 
 import weakref
@@ -79,70 +82,95 @@ INSTANCE_OBSERVER_ATTR = "_observed__observers"
 
 class ObserverFunction(object):
     """
-    I wrap a function which is observing another function or method.
+    I wrap a function which is registered as an observer.
     
     I use a weak reference to the observing function so that being an observer
-    does not prevent the observing function from being garbage collected.
+    does not prevent garbage collection of the observing function.
     """
+
     def __init__(self, func, identify_observed, weakref_info):
+        """Initialize an ObserverFunction.
+
+        Args:
+            func: function I wrap. I call this function when I am called.
+            identify_observed: boolean indicating whether or not I will pass
+                the observed object as the first argument to the function I
+                wrap. True means pass the observed object, False means do not
+                pass the observed objec.
+            weakref_info: Tuple of (key, dict) where dict is the dictionary
+                which is keeping track of my role as an observer and key is
+                the key in that dict which maps to me. When the function I wrap
+                is finalized, I use this information to delete myself from the
+                dictionary.
         """
-        func is the observer function which will be called when the observed
-        is called.
-        
-        identify_observed = True means that we will pass the observed thing
-        as the first argument to func whenever we call func.
-        
-        weakref_info is the information I need in order to clean myself up if
-        and when func is garbage collected.
-        """
+
         # For some reason, if we put the update_wrapper after we make the
         # weak reference to func, the call to weakref.ref returns a function
-        # instead of a weak ref. So, don't move the next line :\
+        # instead of a weak ref. So, don't move the next line chomp, chomp...
         functools.update_wrapper(self, func)
         self.identify_observed = identify_observed
         key, d = weakref_info
-        self.func = weakref.ref(func, CleanupHandler(key, d))
+        self.func_wr = weakref.ref(func, CleanupHandler(key, d))
     
     def __call__(self, observed_obj, *arg, **kw):
+        """Call the function I wrap.
+
+        Args:
+            *arg: The arguments passed to me by the observed object.
+            **kw: The keyword args passed to me by the observed object.
+            observed_obj: The observed object which called me.
+
+        Returns:
+            Whatever the function I wrap returns.
         """
-        Call the function I wrap.
-        
-        If observed_obj = True, we pass the observed object as the first
-        argument.
-        """
+
         if self.identify_observed:
-            return self.func()(observed_obj, *arg, **kw)
+            return self.func_wr()(observed_obj, *arg, **kw)
         else:
-            return self.func()(*arg, **kw)
+            return self.func_wr()(*arg, **kw)
 
 
 class ObserverBoundMethod(object):
+    """I wrap a bound method which is registered as an observer.
+
+    I use a weak reference to the observing bound method's instance so that
+    being an observer does not prevent garbage collection of that instance.
     """
-    I am a bound method which observes another function or method.
-    """
+
     def __init__(self, inst, method_name, identify_observed, weakref_info):
+        """Initialize an ObserverBoundMethod.
+
+        Args:
+            inst: the object to which the bound method I wrap is bound.
+            method_name: the name of the method I wrap.
+            identify_observed: boolean indicating whether or not I will pass
+                the observed object as the first argument to the function I
+                wrap. True means pass the observed object, False means do not
+                pass the observed objec.
+            weakref_info: Tuple of (key, dict) where dict is the dictionary
+                which is keeping track of my role as an observer and key is
+                the key in that dict which maps to me. When the function I wrap
+                is finalized, I use this information to delete myself from the
+                dictionary.
         """
-        inst is the object to which I am bound.
-        
-        method_name is the name of the function I wrap.
-        
-        observed_obj is the object I observe.
-        
-        weakref_info is the information I need in order to clean myself up when
-        my inst is garbage collected.
-        """
+
         self.identify_observed = identify_observed
         key, d = weakref_info
         self.inst = weakref.ref(inst, CleanupHandler(key, d))
         self.method_name = method_name
     
     def __call__(self, observed_obj, *arg, **kw):
+        """Call the function I wrap.
+
+        Args:
+            *arg: The arguments passed to me by the observed object.
+            **kw: The keyword args passed to me by the observed object.
+            observed_obj: The observed object which called me.
+
+        Returns:
+            Whatever the function I wrap returns.
         """
-        Call the function I wrap.
-        
-        If observed_obj = True, we pass the observed object as the first
-        argument.
-        """
+
         bound_method = getattr(self.inst(), self.method_name)
         if self.identify_observed:
             return bound_method(observed_obj, *arg, **kw)
@@ -151,63 +179,82 @@ class ObserverBoundMethod(object):
 
 
 class ObservableFunction(object):
-    """
-    A function which can be observed.
-    
-    I wrap a function and allow other callables to subscribe to be called
-    whenever I am called.
-    
-    Observers (ie. callbacks) are added and removed from me through the
-    following two methods:
-    
+    """A function which can be observed.
+
+    I wrap a function and allow other callables to register as observers of it.
+    If you have a function func, then ObservableFunction(func) is a wrapper
+    around func which can accept observers.
+
+    Add and remove observers using:
+
     add_observer(observer)
         registers observer to be called whenever I am called
-    
+
     discard_observer(observer)
         Removes an observer from the set of observers.
+
+    Attributes:
+        func: The function I wrap.
+        observers: Dict mapping keys unique to each observer to that observer.
+            If this sounds like a job better served by a set, you're probably
+            right and making that change is planned. It's delicate because it
+            requires making sure the observer objects are hashable and have a
+            proper notion of equality.
     """
 
     def __init__(self, func):
+        """Initialize an ObservableFunction.
+
+        Args:
+            func: The function I wrap.
         """
-        Initialize an ObservableFunction.
-        
-        func is the function we wish to make observable.
-        """
+
         functools.update_wrapper(self, func)
         self.func = func
-        self.observers = {} #observing object ID -> weak ref, info
+        self.observers = {}  # observer key -> observer
 
     def add_observer(self, observer, identify_observed=False):
-        """
-        Register an observer to observe me.
-        
-        Returns True if the observer was added, False otherwise.
-        
+        """Register an observer to observe me.
+
+        Args:
+            observer: The callable to register as an observer.
+            identify_observed: If True, then the observer will get myself
+                passed as an additional first argument whenever it is invoked.
+                See ObserverFunction and ObserverBoundMethod to see how this
+                works.
+
+        Returns:
+            True if the observer was added, False otherwise.
+
         The observing function or method will be called whenever I am called,
         and with the same arguments and keyword arguments.
-        
-        If identify_observed is True, then the observer will get myself passed
-        as an additional first argument whenever it is invoked. See
-        ObserverFunction and ObserverBoundMethod to see how this works.
-        
+
         If a bound method or function has already been registered as an
         observer, trying to add it again does nothing. In other words, there is
         no way to sign up an observer to be called back multiple times. This
         was a conscious design choice which users are invited to complain about
         if there is a compelling use case where this is inconvenient.
         """
-        # IF the observer is a bound method,
+
+        # If the observer is a bound method,
         if hasattr(observer, "__self__"):
             result = self._add_bound_method(observer, identify_observed)
-        # otherwise, assume observer is a normal function.
-        # Note that we do not handle class methods or static methods, so use
-        # them as observers at your peril.
+        # Otherwise, assume observer is a normal function.
         else:
             result = self._add_function(observer, identify_observed)
         return result
 
     def _add_function(self, func, identify_observed):
-        """Add a function as an observer."""
+        """Add a function as an observer.
+
+        Args:
+            func: The function to register as an observer.
+            identify_observed: See docstring for add_observer.
+
+        Returns:
+            True if the function is added, otherwise False.
+        """
+
         key = self.make_key(func)
         if key not in self.observers:
             self.observers[key] = ObserverFunction(
@@ -217,7 +264,16 @@ class ObservableFunction(object):
             return False
 
     def _add_bound_method(self, bound_method, identify_observed):
-        """Add an bound method as an observer."""
+        """Add an bound method as an observer.
+
+        Args:
+            bound_method: The bound method to add as an observer.
+            identify_observed: See the docstring for add_observer.
+
+        Returns:
+            True if the bound method is added, otherwise False.
+        """
+
         inst = bound_method.__self__
         method_name = bound_method.__name__
         key = self.make_key(bound_method)
@@ -229,10 +285,12 @@ class ObservableFunction(object):
             return False
 
     def discard_observer(self, observer):
-        """
-        Un-register an observer.
-        
-        Returns true if an observer was removed, False otherwise.
+        """Un-register an observer.
+
+        Args:
+            observer: The observer to un-register.
+
+        Returns true if an observer was removed, otherwise False.
         """
         discarded = False
         key = self.make_key(observer)
@@ -243,11 +301,8 @@ class ObservableFunction(object):
 
     @staticmethod
     def make_key(observer):
-        """
-        Construct a suitable key for an observer.
-        
-        This key is used to uniquely find observers for removal.
-        """
+        """Construct a unique, hashable, immutable key for an observer."""
+
         if hasattr(observer, "__self__"):
             inst = observer.__self__
             method_name = observer.__name__
@@ -257,12 +312,18 @@ class ObservableFunction(object):
         return key
 
     def __call__(self, *arg, **kw):
-        """
-        Invoke the callable which I proxy, and all of my observers.
-        
+        """Invoke the callable which I proxy, and all of my observers.
+
         The observers are called with the same *args and **kw as the main
         callable.
-        
+
+        Args:
+            *arg: The arguments you want to pass to the callable which I wrap.
+            **kw: The keyword args you want to pass to the callable I wrap.
+
+        Returns:
+            Whatever the wrapped callable returns.
+
         Note:
         I think it is possible for observers to disappear while we execute
         them. It might be better to make strong references to all
@@ -276,34 +337,57 @@ class ObservableFunction(object):
 
 
 class ObservableBoundMethod(ObservableFunction):
-    """I am a bound method version of ObservableFunction."""
+    """I wrap a bound method and allow observers to be registered."""
+
     def __init__(self, func, inst, observers):
+        """Initialize an ObservableBoundMethod.
+
+        Args:
+            func: The function (i.e. unbound method) I wrap.
+            inst: The instance to which I am bound.
+            observers: Dict mapping keys unique to each observer to that
+                observer. This dict comes from the descriptor which generates
+                this ObservableBoundMethod instance. In this way, multiple
+                instances of ObservableBoundMethod with the same underlying
+                object instance and method all add, remove, and call observers
+                from the same collection.
+                If you think this dict should probably be a set instead then
+                you probably grok this module.
         """
-        func is the function I wrap.
-        
-        inst is the object instance to which I'm bound.
-        
-        observers keeps track of my observers. It is shared by the
-        ObservableMethodManager which created me. See the documentation for
-        ObservableMethodManager.
-        """
+
         self.func = func
         functools.update_wrapper(self, func)
         self.inst = inst
         self.observers = observers
 
     def __call__(self, *arg, **kw):
-        """Call the function I wrap and all of my observers."""
+        """Invoke the bound method I wrap, and all of my observers.
+
+        The observers are called with the same *args and **kw as the bound
+        method I wrap.
+
+        Args:
+            *arg: The arguments you want to pass to the callable which I wrap.
+            **kw: The keyword args you want to pass to the callable I wrap.
+
+        Returns:
+            Whatever the wrapped bound method returns.
+
+        Note:
+        I think it is possible for observers to disappear while we execute
+        them. It might be better to make strong references to all
+        observers before we start callback execution, since we don't keep
+        strong references elsewhere.
+        """
+
         result = self.func(self.inst, *arg, **kw)
         for key in self.observers:
             self.observers[key](self, *arg, **kw)
         return result
 
     def __eq__(self, other):
-        """Check equality of this bound method with another.
-        
-        Equality is given if the instances and underlying functions are equal.
-        """
+        """Check equality of this bound method with another."""
+
         return all((
             self.inst == other.inst,
             self.func == other.func))
@@ -311,36 +395,64 @@ class ObservableBoundMethod(ObservableFunction):
     @property
     def __self__(self):
         """The instance to which I'm bound."""
+
         return self.inst
 
 
+# The following two classes are descriptors which manage access to observable
+# methods. Suppose you have a class Foo with method bar. Now suppose you have
+# an instance my_foo of Foo. When python sees my_foo.bar it creates a bound
+# method and gives it to you. You can't register observers on normal bound
+# methods. Therefore, we use descriptors to intercept the .bar access. The
+# descriptor creates a wrapper around the usual bound method, a wrapper which
+# can accept observers. This wrapper is ObservableBoundMethod.
+# Now, how do we keep track of registered observers? We can't just store them
+# as attributes of the ObservableBoundMethod because the ObservableBoundMethod
+# doesn't necessarily live very long. If we do
+# my_foo.bar.add_observer(some_observer)
+# and then later call my_foo.bar(...), the ObservableBoundMethod active in
+# those two cases are not the same object. Therefore, we must persist the
+# observers somewhere else. An obvious option is to store the observers as an
+# attribute of my_foo. This strategy is implemented in
+# ObservableMethodManager_PersistOnInstances. The other strategy is to persist
+# the observers within the descriptor itself. In this strategy, the descriptor
+# holds a dict mapping instance id's to sets of observers. This strategy is
+# implemented in ObservableMethodManager_PersistOnDescriptor.
+
+
 class ObservableMethodManager_PersistOnInstances(object):
-    """
-    I manage access to observable methods.
-    
+    """I manage access to observable methods.
+
     When accessed through an instance I return an ObservableBoundMethod.
     When accessed through a class I return an ObservableUnboundMethod.
-    
+
     When an instance accesses me, I create an ObservableBoundMethod for that
     instance and return it.
     """
+
     def __init__(self, func):
+        """Initialize an ObservableMethodManager_PersistOnInstances.
+
+        Args:
+            func: the function (i.e.unbound method) I manage.
         """
-        Initialize me.
-        
-        func is the function I will give to the ObservableBoundMethods I
-        create.
-        """
+
         self._func = func
         self._unbound_method = ObservableUnboundMethod(self)
 
     def __get__(self, inst, cls):
+        """Return an ObservableBoundMethod or ObservableUnboundMethod.
+
+        If accessed by instance, I return an ObservableBoundMethod which
+        handles that instance. If accessed by class I return an
+        ObservableUnboundMethod.
+
+        Args:
+            inst: The instance through which I was accessed. This will be None
+                if I was accessed through the class, i.e. as an unbound method.
+            cls: The class through which I was accessed.
         """
-        If accessed by instance I return an ObservableBoundMethod which handles
-        that instance.
-        
-        If accessed by class I return an ObservableUnboundMethod.
-        """
+
         if inst is None:
             return self._unbound_method
         else:
@@ -354,19 +466,22 @@ class ObservableMethodManager_PersistOnInstances(object):
 
     def __set__(self, inst, val):
         """Disallow setting because we don't guarantee behavior."""
+
         raise RuntimeError("Assignment not supported")
 
 
 class ObservableMethodManager_PersistOnDescriptor(object):
-    """
-    I manage access to observable methods.
-    
+    """I manage access to observable methods.
+
     When accessed through an instance I return an ObservableBoundMethod.
     When accessed through a class I return an ObservableUnboundMethod.
-    
+
+    Instead of storing observers as attributes on the instances whose bound
+    method is being observed, I store them here.
+
     I store no strong references to the instances I manage. This guarantees
     that I don't prevent garbage collection of those instances.
-    
+
     When an instance accesses me, I create an ObservableBoundMethod for that
     instance and return it. Observers added to that ObservableBoundMethod, are
     persisted by me, not as attributes of the instances.
