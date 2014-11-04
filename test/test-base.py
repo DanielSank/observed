@@ -14,8 +14,11 @@ def get_caller_name(caller):
         caller: The observed object which is calling an observer.
 
     Returns:
-        The name of the caller.
+        The name of the caller. If the caller is a function we return that
+        function's .__name__. If the caller is a bound method we return the
+        name of bound object.
     """
+
     if hasattr(caller, "__self__"):
         # caller is a Foo instance
         name = caller.__self__.name
@@ -26,11 +29,12 @@ def get_caller_name(caller):
 
 
 def clear_list(l):
-    """Remove all entries from a list.
+    """Remove all entries from a list in place.
 
     Args:
         l: The list to be cleared.
     """
+
     while True:
         try:
             l.pop(0)
@@ -39,7 +43,7 @@ def clear_list(l):
 
 
 class Foo(object):
-    """A generic class with observable methods.
+    """A class with some observable methods and some normal methods.
 
     Attributes:
         name - string: A string naming the instance.
@@ -66,6 +70,7 @@ class Foo(object):
             buf: A buffer (list) into which I write data when my methods are
                 called. See the class docstring for details.
         """
+
         self.name = name
         self.buf = buf
     
@@ -90,10 +95,21 @@ class Foo(object):
 
         We don't include milton because our testing procedure isn't smart
         enough to know to call it with an argument.
+
+        Returns:
+            A list of the names of my observable methods.
         """
+
         return [self.bar]
 
     def method_info(self):
+        """Get a list of method names and whether they want caller id.
+
+        Returns:
+            A list of tuples. Each tuple is
+            (str: method name, bool: identify_observed).
+        """
+
         return [(self.bar, False),
                 (self.baz, False),
                 (self.milton, True),
@@ -101,7 +117,7 @@ class Foo(object):
 
 
 class Goo(Foo):
-    """A class using the descriptor strategy for observable methods.
+    """Same as Foo but using the descriptor strategy for observer persistence.
 
     I am entirely similar to Foo except that my observable methods use the
     descriptor persistence strategy. See the docstring for observable_method
@@ -121,8 +137,15 @@ class Goo(Foo):
 def get_observables(*objs):
     """Get a list observables from some objects.
 
-    For each object, if it's a Foo or subclass, we get all of the object's
-    observable methods. If it's a function
+    Args:
+        Any number of objects. Each object must be either a Foo (or subclass)
+        instance or a function.
+
+    Returns:
+        A list of observable things, either functions or methods bound to the
+        object. Each function passed in as an argument is placed directly into
+        the returned list. For each Foo instance passed in, we get each of that
+        instance's observable methods and place each one in the output list.        
     """
 
     observables = []
@@ -137,6 +160,13 @@ def get_observables(*objs):
 
 
 def get_observer_sets(*objs):
+    """Get observers from a set of objects.
+
+    Returns:
+        A list of tuples. Each tuple is an observer and a boolean corresponding
+        to the value of identify_observed which should be used when registering
+        that observer.
+    """
     observer_sets = []
     single_observers = []
     for obj in objs:
@@ -151,7 +181,16 @@ def get_observer_sets(*objs):
 
 
 def get_items(observables, observer_sets):
+    """Get all combinations of observer/observed and expected test data.
 
+    Returns:
+        A list of tuples. Each tuple contains:
+            an observable object
+            a list of (observer, identify_observed) tuples
+            expected buffer data for this combination
+            expected buffer data for calling the obsevable after all observers
+            have been un-registered.
+    """
     def get_buff_data(observable, observer, identify_observed):
         """Get the buffer data an object will write."""
         if hasattr(observer, '__self__'):
@@ -237,9 +276,8 @@ class TestBasics(unittest.TestCase):
             clear_list(self.buf)
 
     def test_discard(self):
-        """
-        discard_observer prevents future ivocation.
-        """
+        """Test that discard_observer prevents future ivocation."""
+
         a = Foo('a', self.buf)
         def f():
             self.buf.append('f')
@@ -253,6 +291,8 @@ class TestBasics(unittest.TestCase):
         self.assertEqual(self.buf, ['abar'])
 
     def test_unbound_method(self):
+        """Test that calling an unbound method invokes observers."""
+
         f = Foo('f', self.buf)
 
         def func():
@@ -263,6 +303,8 @@ class TestBasics(unittest.TestCase):
         self.assertEqual(self.buf, ['fbar', 'func'])
 
     def test_equality(self):
+        """Test equality of observable bound methods."""
+
         f = Foo('f', self.buf)
         g = Foo('g', self.buf)
 
@@ -276,9 +318,8 @@ class TestBasics(unittest.TestCase):
         self.assertEqual(func, func)
 
     def test_callerIdentification(self):
-        """
-        The observed object can pass itself as first argument.
-        """
+        """The observed object can pass itself as first argument."""
+
         a = Foo('a', self.buf)
         
         @observable_function
