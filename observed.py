@@ -382,7 +382,7 @@ class ObservableBoundMethod(ObservableFunction):
 
         result = self.func(self.inst, *arg, **kw)
         for key in self.observers:
-            self.observers[key](self, *arg, **kw)
+            self.observers[key](self.__self__, *arg, **kw)
         return result
 
     def __eq__(self, other):
