@@ -131,7 +131,7 @@ See the file NEWS for the user-visible changes from previous releases.
 License
 =======
 
-observed is free (as in beer) software.  See the LICENSE file.
+See `LICENSE.txt`.
 
 
 Downloading
