@@ -1,10 +1,8 @@
-import unittest
-import sys
-import os
 import itertools
-sys.path.insert(0, os.path.abspath('..'))
+
 import observed
 from observed import observable_function, observable_method
+import pytest
 
 
 def get_caller_name(caller):
@@ -73,19 +71,19 @@ class Foo(object):
 
         self.name = name
         self.buf = buf
-    
-    @observable_method
+
+    @observable_method()
     def bar(self):
         self.buf.append("%sbar"%(self.name,))
-    
+
     def baz(self):
         self.buf.append("%sbaz"%(self.name,))
-    
-    @observable_method
+
+    @observable_method()
     def milton(self, caller):
         caller_name = get_caller_name(caller)
         self.buf.append("%smilton%s"%(self.name, caller_name))
-    
+
     def waldo(self, caller):
         caller_name = get_caller_name(caller)
         self.buf.append("%swaldo%s"%(self.name, caller_name))
@@ -126,12 +124,12 @@ class Goo(Foo):
 
     def bar(self):
         self.buf.append("%sbar"%(self.name,))
-    bar = observable_method(bar, strategy='descriptor')
+    bar = observed.get_observable_method(bar, strategy='descriptor')
 
     def milton(self, caller):
         caller_name = get_caller_name(caller)
         self.buf.append("%smilton%s"%(self.name, caller_name))
-    milton = observable_method(milton, strategy='descriptor')
+    milton = observed.get_observable_method(milton, strategy='descriptor')
 
 
 def get_observables(*objs):
@@ -223,14 +221,16 @@ def get_items(observables, observer_sets):
     return items
 
 
-class TestBasics(unittest.TestCase):
+class TestBasics:
     """Test that observers are called when the observed object is called."""
 
-    def setUp(self):
+    @classmethod
+    def setup_class(self):
         self.buf = []
-    
-    def tearDown(self):
-        pass    
+
+    @classmethod
+    def teardown_class(self):
+        pass
 
     def test_callbacks(self):
         """
@@ -250,7 +250,7 @@ class TestBasics(unittest.TestCase):
         @observable_function
         def f():
             self.buf.append('f')
-        
+
         @observable_function
         def g(caller):
             self.buf.append('g%s'%(get_caller_name(caller),))
@@ -267,12 +267,12 @@ class TestBasics(unittest.TestCase):
                     identify_observed=identify_observed)
             observed()
             self.buf.sort()
-            self.assertEqual(self.buf, expected_buf)
+            assert self.buf == expected_buf
             clear_list(self.buf)
             for observer, _ in observer_set:
                 observed.discard_observer(observer)
             observed()
-            self.assertEqual(self.buf, final_buf)
+            assert self.buf == final_buf
             clear_list(self.buf)
 
     def test_discard(self):
@@ -281,26 +281,27 @@ class TestBasics(unittest.TestCase):
         a = Foo('a', self.buf)
         def f():
             self.buf.append('f')
-        
+
         a.bar.add_observer(f)
         result = a.bar.discard_observer(f)
-        self.assertEqual(result, True)
+        assert result == True
         result = a.bar.discard_observer(f)
-        self.assertEqual(result, False)
+        assert result == False
         a.bar()
-        self.assertEqual(self.buf, ['abar'])
+        assert self.buf == ['abar']
 
     def test_unbound_method(self):
         """Test that calling an unbound method invokes observers."""
 
-        f = Foo('f', self.buf)
+        buf = []
+        f = Foo('f', buf)
 
         def func():
-            self.buf.append('func')
+            buf.append('func')
 
         f.bar.add_observer(func)
         Foo.bar(f)
-        self.assertEqual(self.buf, ['fbar', 'func'])
+        assert buf == ['fbar', 'func']
 
     def test_equality(self):
         """Test equality of observable bound methods."""
@@ -312,29 +313,26 @@ class TestBasics(unittest.TestCase):
         def func():
             self.buf.append('func')
 
-        self.assertEqual(Foo.bar, Foo.bar)
-        self.assertEqual(f.bar, f.bar)
-        self.assertNotEqual(f.bar, g.bar)
-        self.assertEqual(func, func)
+        assert Foo.bar == Foo.bar
+        assert f.bar == f.bar
+        assert f.bar != g.bar
+        assert func == func
 
-    def test_callerIdentification(self):
+    def test_caller_identification(self):
         """The observed object can pass itself as first argument."""
 
-        a = Foo('a', self.buf)
-        
+        buf = []
+        a = Foo('a', buf)
+
         @observable_function
         def f():
-            self.buf.append('f')
-        
+            buf.append('f')
+
         def g(caller):
-            self.buf.append('g%s'%(caller.__name__,))
-        
+            buf.append('g%s'%(caller.__name__,))
+
         f.add_observer(g, identify_observed=True)
         f.add_observer(a.milton, identify_observed=True)
         f()
-        self.buf.sort()
-        self.assertEqual(self.buf, ['amiltonf','f', 'gf'])
-
-
-if __name__ == "__main__":
-    unittest.main()
+        buf.sort()
+        assert buf == ['amiltonf','f', 'gf']

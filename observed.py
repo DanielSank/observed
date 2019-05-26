@@ -40,9 +40,9 @@ observed_func('banana')
 
 Methods can be observed as well:
 
-class Foo(object):
+class Foo:
 
-    @observable_method
+    @observable_method()
     def bar(self, x):
         print("bar called with argument %s"%(x,))
 
@@ -74,16 +74,15 @@ and ObserverBoundMethod.
 import weakref
 import functools
 
-__version__ = "0.5"
+__version__ = "0.5.1"
 
 
 INSTANCE_OBSERVER_ATTR = "_observed__observers"
 
 
-class ObserverFunction(object):
-    """
-    I wrap a function which is registered as an observer.
-    
+class ObserverFunction:
+    """Wraps a function which is registered as an observer.
+
     I use a weak reference to the observing function so that being an observer
     does not prevent garbage collection of the observing function.
     """
@@ -111,7 +110,7 @@ class ObserverFunction(object):
         self.identify_observed = identify_observed
         key, d = weakref_info
         self.func_wr = weakref.ref(func, CleanupHandler(key, d))
-    
+
     def __call__(self, observed_obj, *arg, **kw):
         """Call the function I wrap.
 
@@ -130,7 +129,7 @@ class ObserverFunction(object):
             return self.func_wr()(*arg, **kw)
 
 
-class ObserverBoundMethod(object):
+class ObserverBoundMethod:
     """I wrap a bound method which is registered as an observer.
 
     I use a weak reference to the observing bound method's instance so that
@@ -178,7 +177,7 @@ class ObserverBoundMethod(object):
             return bound_method(*arg, **kw)
 
 
-class ObservableFunction(object):
+class ObservableFunction:
     """A function which can be observed.
 
     I wrap a function and allow other callables to register as observers of it.
@@ -399,28 +398,30 @@ class ObservableBoundMethod(ObservableFunction):
         return self.inst
 
 
-# The following two classes are descriptors which manage access to observable
-# methods. Suppose you have a class Foo with method bar. Now suppose you have
-# an instance my_foo of Foo. When python sees my_foo.bar it creates a bound
-# method and gives it to you. You can't register observers on normal bound
-# methods. Therefore, we use descriptors to intercept the .bar access. The
-# descriptor creates a wrapper around the usual bound method, a wrapper which
-# can accept observers. This wrapper is ObservableBoundMethod.
-# Now, how do we keep track of registered observers? We can't just store them
-# as attributes of the ObservableBoundMethod because the ObservableBoundMethod
-# doesn't necessarily live very long. If we do
-# my_foo.bar.add_observer(some_observer)
-# and then later call my_foo.bar(...), the ObservableBoundMethod active in
-# those two cases are not the same object. Therefore, we must persist the
-# observers somewhere else. An obvious option is to store the observers as an
-# attribute of my_foo. This strategy is implemented in
-# ObservableMethodManager_PersistOnInstances. The other strategy is to persist
-# the observers within the descriptor itself. In this strategy, the descriptor
-# holds a dict mapping instance id's to sets of observers. This strategy is
-# implemented in ObservableMethodManager_PersistOnDescriptor.
+"""
+The following two classes are descriptors which manage access to observable
+methods. Suppose we have a class Foo with method bar, and suppose we have an
+instance foo of Foo. When Python sees foo.bar it creates and returns a bound
+method. Regular bound methods don't support registering observers. Therefore,
+we use descriptors to intercept the .bar access. The descriptor creates a
+wrapper around the usual bound method. This wrapper can accept observers.
+Now, how do we keep track of registered observers? We can't just store them as
+attributes of the ObservableBoundMethod because the ObservableBoundMethod
+doesn't necessarily live very long. If we do
+    foo.bar.add_observer(some_observer)
+and then later call
+    foo.bar(...)
+the ObservableBoundMethod active in those two cases are not the same object.
+Therefore, we must persist the observers somewhere else. An obvious option is
+to store the observers as an attribute of foo. This strategy is implemented in
+ObservableMethodManager_PersistOnInstances. The other strategy is to persist the
+observers within the descriptor itself. In this strategy, the descriptor holds
+a mapping from instance id's to mappings from methods to observers. This
+strategy is implemented in ObservableMethodManager_PersistOnDescriptor.
+"""
 
 
-class ObservableMethodManager_PersistOnInstances(object):
+class ObservableMethodManager_PersistOnInstances:
     """I manage access to observable methods.
 
     When accessed through an instance I return an ObservableBoundMethod.
@@ -470,8 +471,8 @@ class ObservableMethodManager_PersistOnInstances(object):
         raise RuntimeError("Assignment not supported")
 
 
-class ObservableMethodManager_PersistOnDescriptor(object):
-    """I manage access to observable methods.
+class ObservableMethodManager_PersistOnDescriptor:
+    """Manage access to observable methods.
 
     When accessed through an instance I return an ObservableBoundMethod.
     When accessed through a class I return an ObservableUnboundMethod.
@@ -496,14 +497,13 @@ class ObservableMethodManager_PersistOnDescriptor(object):
     # this doesn't make sense draw a picture of what references what and it
     # will become clear.
     # The other option is to persist the observers as attributes of the
-    # instances themselves. This may be a better option than what we're doing
-    # here, because it simplifies the code and makes pickling easier.
+    # instances themselves, which is done by
+    #   ObservableMethodManager_PersistOnInstances.
+
     def __init__(self, func):
-        """
-        Initialize me.
-        
-        func is the function I will give to the ObservableBoundMethods I
-        create.
+        """Initialize an ObservableMethodManager_PersistOnDescriptor.
+
+        func is the function I will give to the ObservableBoundMethods I create.
         """
         self._func = func
         self._unbound_method = ObservableUnboundMethod(self)
@@ -511,10 +511,11 @@ class ObservableMethodManager_PersistOnDescriptor(object):
         self.instances = {}
 
     def __get__(self, inst, cls):
-        """
+        """Return an ObservableBoundMethod or ObservableUnboundMethod.
+
         If accessed by instance I return an ObservableBoundMethod which handles
         that instance.
-        
+
         If accessed by class I return an ObservableUnboundMethod.
         """
         if inst is None:
@@ -544,24 +545,22 @@ class ObservableMethodManager_PersistOnDescriptor(object):
         raise RuntimeError("Assignment not supported")
 
 
-class ObservableUnboundMethod(object):
-    """
-    Wrapper for an unbound version of an observable method.
-    """
+class ObservableUnboundMethod:
+    """Wrapper for an unbound version of an observable method."""
+
     def __init__(self, manager):
-        """
-        Create an ObservableUnboundMethod.
-        
-        manager is the descriptor in charge of this method. See
-        ObservableMethodManager.
+        """ Create an ObservableUnboundMethod.
+
+        Args:
+            manager: the descriptor in charge of this method. See
+                ObservableMethodManager.
         """
         self._manager = manager
         functools.update_wrapper(self, manager._func)
 
     def __call__(self, obj, *arg, **kw):
-        """
-        Call the unbound method.
-        
+        """ Call the unbound method.
+
         We essentially build a bound method and call that. This ensures that
         the code for managing observers is invoked in the same was as it would
         be for a bound method.
@@ -570,121 +569,116 @@ class ObservableUnboundMethod(object):
         return bound_method(*arg, **kw)
 
 
-class CleanupHandler(object):
-    """
-    I manage removal of weak references from their storage points.
-    
-    Use me as a weakref.ref callback to remove an object's id from a dict
-    when that object is garbage collected.
+class CleanupHandler:
+    """Manage removal of weak references from their storage points.
+
+    Use me as a weakref.ref callback to remove an object's id from a dict when
+    that object is garbage collected.
     """
     def __init__(self, key, d):
-        """
-        Initialize a cleanup handler.
-        
-        key is the key we will delete.
-        d is the dict from which we will delete it.
+        """ Initialize a cleanup handler.
+
+        Args:
+            key: the key we will delete.
+            d: the dict from which we will delete it.
         """
         self.key = key
         self.d = d
 
     def __call__(self, wr):
-        """
-        Remove an entry from the dict.
-        
-        When a weak ref's object expires, the CleanupHandler is called,
-        which invokes this method.
+        """Remove an entry from the dict.
+
+        When a weak ref's object expires, the CleanupHandler is called, which
+        invokes this method.
+
+        Args:
+            wr: The weak reference being finalized.
         """
         if self.key in self.d:
             del self.d[self.key]
 
 
 def observable_function(func):
-    """
-    I turn a function into something that can be observed by other callables.
-    
+    """Decorate a function to make it observable.
+
     Use me as a decorator on a function, like this:
-    
-    @observable_function
-    def my_func(x):
-        print("my_func called with arg: %s"%(x,))
-    
-    Now other functions and methods can sign up to get notified when my_func is
-    called:
-    
-    def callback(x):
-        print("callback called with arg: %s"%(x,))
-    
-    class Foo(object):
-        def bar(self, x):
-            print("Foo object's .bar called with arg: %s"%(x,))
-    
-    f = Foo()
-    my_func.add_observer(callback)
-    my_func.add_observer(f.bar)
-    my_func('banana')
-    
-    >>> my_func called with arg: banana
-    >>> callback called with arg: banana
-    >>> Foo object's .bar called with arg: banana
-    
+
+        @observable_function
+        def my_func(x):
+            print("my_func called with arg: %s"%(x,))
+
+        def callback(x):
+            print("callback called with arg: %s"%(x,))
+
+        class Foo:
+            def bar(self, x):
+                print("Foo object's .bar called with arg: %s"%(x,))
+
+        foo = Foo()
+        my_func.add_observer(callback)
+        my_func.add_observer(foo.bar)
+        my_func('banana')
+
+        >>> my_func called with arg: banana
+        >>> callback called with arg: banana
+        >>> Foo object's .bar called with arg: banana
+
     Unregister observers like this:
-    
-    my_func.discard_observer(callback)
+
+        my_func.discard_observer(callback)
     """
     return ObservableFunction(func)
 
 
-def observable_method(func, strategy='instances'):
-    """
-    I turn a method into something that can be observed by other callables.
-    
+def get_observable_method(func, strategy):
+    """Decorate a method to make it observable.
+
     You can use me as a decorator on a method, like this:
-    
-    class Foo(object):
-        __init__(self, name):
-            self.name = name
-        
-        @observable_method
-        def bar(self, x):
-            print("%s called bar with arg: %s"%(self.name, x))
-    
+
+        class Foo:
+            __init__(self, name):
+                self.name = name
+
+            @observable_method
+            def bar(self, x):
+                print("%s called bar with arg: %s"%(self.name, x))
+
     Now other functions and methods can sign up to get notified when my_func is
     called:
-    
-    def observer(x):
-        print("observer called with arg: %s"%(x,))
-    
-    a = Foo('a')
-    b = Foo('b')
-    a.bar.add_observer(observer)
-    a.bar.add_observer(b.bar)
-    a.bar('banana')
-    >>> a called bar with arg: banana
-    >>> b called bar with arg: banana
-    >>> observer called with arg: banana
-    
+
+        def observer(x):
+            print("observer called with arg: %s"%(x,))
+
+        a = Foo('a')
+        b = Foo('b')
+        a.bar.add_observer(observer)
+        a.bar.add_observer(b.bar)
+        a.bar('banana')
+        >>> a called bar with arg: banana
+        >>> b called bar with arg: banana
+        >>> observer called with arg: banana
+
     Note that bar can be an observer as well as observed.
-    
+
     Unregister observers like this:
-    
-    a.bar.discard_observer(observer)
-    
+
+        a.bar.discard_observer(observer)
+
     Args:
-        func: The function (i.e. unbound method) to be made observable.
-        strategy: This argument requires some background explanation. When
-            observers are registered to a bound method, we need to store those
-            observers so that we can call them when the observed method is
-            called. There are two ways to do this as explained below. In any
-            case, access to the observable method is managed by a descriptor,
-            and we select which strategy we use for storing observers by using
-            one descriptor or another. The strategy argument selects the
-            descriptor used.
+        func: The function (i.e. method) to be made observable.
+        strategy: When observers are registered to a bound method, we need to
+            store those observers so that we can call them when the observed
+            method is called. There are two ways to do this as explained below.
+            In any case, access to the observable method is managed by a
+            descriptor, and we select which strategy we use for storing observers
+            by selecting one of two descriptors. The strategy argument selects
+            the descriptor.
 
             The first strategy is to give each instance of the class containing
-            the decorated method an attribute whose value is a collection of
-            observers for each of its observable methods. This is the default
-            strategy and is implemented in
-            ObservableMethodManager_PersistOnInstances.
+            the decorated method an attribute whose value is a mapping from
+            observable method to the functions observing that method. This is
+            the default strategy and is implemented in
+                ObservableMethodManager_PersistOnInstances.
             The advantages of this strategy are that the code is very simple
             and pickling the observers along with the instance owning the
             observable methods is easier.
@@ -692,11 +686,9 @@ def observable_method(func, strategy='instances'):
             The other strategy is to persist the observers for each instance
             inside the descriptor which manages access to that method. This
             strategy is implemented in
-            ObservableMethodManager_PersistOnDescriptor.
-            The advantage(?) of this strategy is that the observer framework
-            doesn't paste any data onto the instances which have observable
-            methods. It's not entirely clear that this is actually useful but
-            we include it as an option.
+                ObservableMethodManager_PersistOnDescriptor.
+            The advantage of this strategy is that it doesn't paste any data
+            onto the instances which have observable methods.
 
             For the simpler strategy in which we store the observers in the
             instances, just use me as a decorator. If you want the alternate
@@ -709,4 +701,8 @@ def observable_method(func, strategy='instances'):
     elif strategy == 'descriptor':
         return ObservableMethodManager_PersistOnDescriptor(func)
     else:
-        raise ValueError("Strategy %s not recognized"%(strategy,))
+        raise ValueError(f"Strategy {strategy} not recognized")
+
+
+def observable_method(strategy='instances'):
+    return lambda func: get_observable_method(func, strategy=strategy)
