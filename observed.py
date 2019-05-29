@@ -74,7 +74,7 @@ and ObserverBoundMethod.
 import weakref
 import functools
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 
 
 INSTANCE_OBSERVER_ATTR = "_observed__observers"
