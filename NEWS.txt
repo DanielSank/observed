@@ -1,3 +1,7 @@
+28 May 2019
+  v0.5.3
+    Fixed mistake in setup.py. Previous release was borked.
+
 24 May 2019
  v0.5 - This is a big release.
         Instead of a single decorator `@event` for both normal functions and
