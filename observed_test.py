@@ -225,7 +225,7 @@ class TestBasics:
     """Test that observers are called when the observed object is called."""
 
     @classmethod
-    def setup_class(self):
+    def setup_method(self):
         self.buf = []
 
     @classmethod
