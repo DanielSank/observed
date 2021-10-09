@@ -73,6 +73,7 @@ and ObserverBoundMethod.
 
 import weakref
 import functools
+from typing import Callable, Tuple, Dict, Union, Any
 
 __version__ = "0.5.3"
 
@@ -87,7 +88,8 @@ class ObserverFunction:
     does not prevent garbage collection of the observing function.
     """
 
-    def __init__(self, func, identify_observed, weakref_info):
+    def __init__(self, func: Callable, identify_observed: bool,
+                 weakref_info: Tuple):
         """Initialize an ObserverFunction.
 
         Args:
@@ -111,7 +113,7 @@ class ObserverFunction:
         key, d = weakref_info
         self.func_wr = weakref.ref(func, CleanupHandler(key, d))
 
-    def __call__(self, observed_obj, *arg, **kw):
+    def __call__(self, observed_obj: Any, *arg: Tuple, **kw: Dict) -> Any:
         """Call the function I wrap.
 
         Args:
@@ -136,7 +138,8 @@ class ObserverBoundMethod:
     being an observer does not prevent garbage collection of that instance.
     """
 
-    def __init__(self, inst, method_name, identify_observed, weakref_info):
+    def __init__(self, inst: Any, method_name: str,
+                 identify_observed: bool, weakref_info: Tuple):
         """Initialize an ObserverBoundMethod.
 
         Args:
@@ -156,9 +159,10 @@ class ObserverBoundMethod:
         self.identify_observed = identify_observed
         key, d = weakref_info
         self.inst = weakref.ref(inst, CleanupHandler(key, d))
-        self.method_name = method_name
-    
-    def __call__(self, observed_obj, *arg, **kw):
+        self.method_name: str = method_name
+
+    def __call__(self, observed_obj: Any,
+                 *arg: Tuple, **kw: Dict) -> Any:
         """Call the function I wrap.
 
         Args:
@@ -201,7 +205,7 @@ class ObservableFunction:
             proper notion of equality.
     """
 
-    def __init__(self, func):
+    def __init__(self, func: Callable):
         """Initialize an ObservableFunction.
 
         Args:
@@ -212,7 +216,7 @@ class ObservableFunction:
         self.func = func
         self.observers = {}  # observer key -> observer
 
-    def add_observer(self, observer, identify_observed=False):
+    def add_observer(self, observer: Callable, identify_observed=False) -> bool:
         """Register an observer to observe me.
 
         Args:
@@ -237,13 +241,13 @@ class ObservableFunction:
 
         # If the observer is a bound method,
         if hasattr(observer, "__self__"):
-            result = self._add_bound_method(observer, identify_observed)
+            result: bool = self._add_bound_method(observer, identify_observed)
         # Otherwise, assume observer is a normal function.
         else:
-            result = self._add_function(observer, identify_observed)
+            result: bool = self._add_function(observer, identify_observed)
         return result
 
-    def _add_function(self, func, identify_observed):
+    def _add_function(self, func: Callable, identify_observed: bool) -> bool:
         """Add a function as an observer.
 
         Args:
@@ -254,15 +258,16 @@ class ObservableFunction:
             True if the function is added, otherwise False.
         """
 
-        key = self.make_key(func)
+        key: Union[int, Tuple] = self.make_key(func)
         if key not in self.observers:
-            self.observers[key] = ObserverFunction(
+            self.observers[key]: Dict = ObserverFunction(
                 func, identify_observed, (key, self.observers))
             return True
         else:
             return False
 
-    def _add_bound_method(self, bound_method, identify_observed):
+    def _add_bound_method(self, bound_method: Callable,
+                          identify_observed: bool) -> bool:
         """Add an bound method as an observer.
 
         Args:
@@ -273,17 +278,17 @@ class ObservableFunction:
             True if the bound method is added, otherwise False.
         """
 
-        inst = bound_method.__self__
-        method_name = bound_method.__name__
-        key = self.make_key(bound_method)
+        inst: any = bound_method.__self__
+        method_name: str = bound_method.__name__
+        key: Union[int, Tuple] = self.make_key(bound_method)
         if key not in self.observers:
-            self.observers[key] = ObserverBoundMethod(
+            self.observers[key]: Key = ObserverBoundMethod(
                 inst, method_name, identify_observed, (key, self.observers))
             return True
         else:
             return False
 
-    def discard_observer(self, observer):
+    def discard_observer(self, observer: Any) -> bool:
         """Un-register an observer.
 
         Args:
@@ -291,26 +296,26 @@ class ObservableFunction:
 
         Returns true if an observer was removed, otherwise False.
         """
-        discarded = False
-        key = self.make_key(observer)
+        discarded: bool = False
+        key: Union[int, Tuple] = self.make_key(observer)
         if key in self.observers:
             del self.observers[key]
             discarded = True
         return discarded
 
     @staticmethod
-    def make_key(observer):
+    def make_key(observer: Any) -> Union[Tuple, int]:
         """Construct a unique, hashable, immutable key for an observer."""
 
         if hasattr(observer, "__self__"):
-            inst = observer.__self__
-            method_name = observer.__name__
-            key = (id(inst), method_name)
+            inst: Any = observer.__self__
+            method_name: str = observer.__name__
+            key: Tuple = (id(inst), method_name)
         else:
-            key = id(observer)
+            key: int = id(observer)
         return key
 
-    def __call__(self, *arg, **kw):
+    def __call__(self, *arg: Tuple, **kw: Dict) -> Any:
         """Invoke the callable which I proxy, and all of my observers.
 
         The observers are called with the same *args and **kw as the main
@@ -329,7 +334,7 @@ class ObservableFunction:
         observers before we start callback execution, since we don't keep
         strong references elsewhere.
         """
-        result = self.func(*arg, **kw)
+        result: Any = self.func(*arg, **kw)
         for key in self.observers:
             self.observers[key](self, *arg, **kw)
         return result
@@ -338,7 +343,7 @@ class ObservableFunction:
 class ObservableBoundMethod(ObservableFunction):
     """I wrap a bound method and allow observers to be registered."""
 
-    def __init__(self, func, inst, observers):
+    def __init__(self, func: Callable, inst: Any, observers: Dict):
         """Initialize an ObservableBoundMethod.
 
         Args:
@@ -354,12 +359,12 @@ class ObservableBoundMethod(ObservableFunction):
                 you probably grok this module.
         """
 
-        self.func = func
+        self.func: Callable = func
         functools.update_wrapper(self, func)
-        self.inst = inst
-        self.observers = observers
+        self.inst: Any = inst
+        self.observers: Dict = observers
 
-    def __call__(self, *arg, **kw):
+    def __call__(self, *arg: Tuple, **kw: Dict) -> Any:
         """Invoke the bound method I wrap, and all of my observers.
 
         The observers are called with the same *args and **kw as the bound
@@ -379,12 +384,12 @@ class ObservableBoundMethod(ObservableFunction):
         strong references elsewhere.
         """
 
-        result = self.func(self.inst, *arg, **kw)
+        result: Any = self.func(self.inst, *arg, **kw)
         for key in self.observers:
             self.observers[key](self, *arg, **kw)
         return result
 
-    def __eq__(self, other):
+    def __eq__(self, other: Any):
         """Check equality of this bound method with another."""
 
         return all((
@@ -420,7 +425,6 @@ a mapping from instance id's to mappings from methods to observers. This
 strategy is implemented in ObservableMethodManager_PersistOnDescriptor.
 """
 
-
 class ObservableMethodManager_PersistOnInstances:
     """I manage access to observable methods.
 
@@ -431,17 +435,18 @@ class ObservableMethodManager_PersistOnInstances:
     instance and return it.
     """
 
-    def __init__(self, func):
+    def __init__(self, func: Callable):
         """Initialize an ObservableMethodManager_PersistOnInstances.
 
         Args:
             func: the function (i.e.unbound method) I manage.
         """
 
-        self._func = func
-        self._unbound_method = ObservableUnboundMethod(self)
+        self._func: Callable = func
+        self._unbound_method: ObservableUnboundMethod = ObservableUnboundMethod(self)
 
-    def __get__(self, inst, cls):
+    def __get__(self, inst: Union[None, Any],
+                cls: Any) -> Union[ObservableBoundMethod, Any]:
         """Return an ObservableBoundMethod or ObservableUnboundMethod.
 
         If accessed by instance, I return an ObservableBoundMethod which
@@ -458,14 +463,14 @@ class ObservableMethodManager_PersistOnInstances:
             return self._unbound_method
         else:
             if not hasattr(inst, INSTANCE_OBSERVER_ATTR):
-                d = {}
+                d: Dict = {}
                 setattr(inst, INSTANCE_OBSERVER_ATTR, d)
             else:
                 d = getattr(inst, INSTANCE_OBSERVER_ATTR)
-            observers = d.setdefault(self._func.__name__, {})
+            observers: Dict = d.setdefault(self._func.__name__, {})
         return ObservableBoundMethod(self._func, inst, observers)
 
-    def __set__(self, inst, val):
+    def __set__(self, inst: Any, val: Any):
         """Disallow setting because we don't guarantee behavior."""
 
         raise RuntimeError("Assignment not supported")
@@ -500,17 +505,18 @@ class ObservableMethodManager_PersistOnDescriptor:
     # instances themselves, which is done by
     #   ObservableMethodManager_PersistOnInstances.
 
-    def __init__(self, func):
+    def __init__(self, func: Callable):
         """Initialize an ObservableMethodManager_PersistOnDescriptor.
 
         func is the function I will give to the ObservableBoundMethods I create.
         """
-        self._func = func
-        self._unbound_method = ObservableUnboundMethod(self)
+        self._func: Callable = func
+        self._unbound_method: ObservableUnboundMethod = ObservableUnboundMethod(self)
         # instance id -> (inst weak ref, observers)
-        self.instances = {}
+        self.instances: Dict = {}
 
-    def __get__(self, inst, cls):
+    def __get__(self, inst: Union[Any, None],
+                cls: Any) -> Union[ObservableBoundMethod, Any]:
         """Return an ObservableBoundMethod or ObservableUnboundMethod.
 
         If accessed by instance I return an ObservableBoundMethod which handles
@@ -528,15 +534,15 @@ class ObservableMethodManager_PersistOnDescriptor:
         # weak ref to the instance, and the observers for that instance. The
         # weak ref has an expiration callback set up to clear the dict entry
         # when the instance is finalized.
-        inst_id = id(inst)
+        inst_id: int = id(inst)
         if inst_id in self.instances:
             wr, observers = self.instances[inst_id]
             if wr() is None:
-                msg = "Unreachable: instance id=%d not cleaned up"%(inst_id,)
+                msg: str = "Unreachable: instance id=%d not cleaned up"%(inst_id,)
                 raise RuntimeError(msg)
         else:
             wr = weakref.ref(inst, CleanupHandler(inst_id, self.instances))
-            observers = {}
+            observers: Dict = {}
             self.instances[inst_id] = (wr, observers)
         return ObservableBoundMethod(self._func, inst, observers)
 
@@ -548,7 +554,9 @@ class ObservableMethodManager_PersistOnDescriptor:
 class ObservableUnboundMethod:
     """Wrapper for an unbound version of an observable method."""
 
-    def __init__(self, manager):
+    def __init__(self,
+                 manager: Union[ObservableMethodManager_PersistOnDescriptor,
+                                ObservableMethodManager_PersistOnInstances]):
         """ Create an ObservableUnboundMethod.
 
         Args:
@@ -558,14 +566,15 @@ class ObservableUnboundMethod:
         self._manager = manager
         functools.update_wrapper(self, manager._func)
 
-    def __call__(self, obj, *arg, **kw):
+    def __call__(self, obj: Any,
+                 *arg: Tuple, **kw: Dict) -> ObservableBoundMethod:
         """ Call the unbound method.
 
         We essentially build a bound method and call that. This ensures that
         the code for managing observers is invoked in the same was as it would
         be for a bound method.
         """
-        bound_method = self._manager.__get__(obj, obj.__class__)
+        bound_method: ObservableBoundMethod = self._manager.__get__(obj, obj.__class__)
         return bound_method(*arg, **kw)
 
 
@@ -575,7 +584,7 @@ class CleanupHandler:
     Use me as a weakref.ref callback to remove an object's id from a dict when
     that object is garbage collected.
     """
-    def __init__(self, key, d):
+    def __init__(self, key: int, d: Dict):
         """ Initialize a cleanup handler.
 
         Args:
@@ -585,7 +594,7 @@ class CleanupHandler:
         self.key = key
         self.d = d
 
-    def __call__(self, wr):
+    def __call__(self, wr: Any):
         """Remove an entry from the dict.
 
         When a weak ref's object expires, the CleanupHandler is called, which
@@ -598,7 +607,7 @@ class CleanupHandler:
             del self.d[self.key]
 
 
-def observable_function(func):
+def observable_function(func: Callable) -> ObservableFunction:
     """Decorate a function to make it observable.
 
     Use me as a decorator on a function, like this:
@@ -630,7 +639,11 @@ def observable_function(func):
     return ObservableFunction(func)
 
 
-def get_observable_method(func, strategy):
+def get_observable_method(func: Callable,
+                          strategy: str) -> Union[
+                              ObservableMethodManager_PersistOnInstances,
+                              ObservableMethodManager_PersistOnDescriptor
+                          ]:
     """Decorate a method to make it observable.
 
     You can use me as a decorator on a method, like this:
@@ -704,5 +717,5 @@ def get_observable_method(func, strategy):
         raise ValueError(f"Strategy {strategy} not recognized")
 
 
-def observable_method(strategy='instances'):
+def observable_method(strategy='instances') -> Callable:
     return lambda func: get_observable_method(func, strategy=strategy)
